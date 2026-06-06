@@ -1,0 +1,247 @@
+# codeX_oracle project configuration
+# This file captures the product brief, architectural constraints, UI system,
+# page requirements, and phased execution rules for the financial portfolio dashboard.
+
+[project]
+name = "codeX_oracle"
+version = "0.0.0"
+target_directory = "C:/Users/Storm/Desktop/codeX_oracle"
+status = "planning"
+stable_reference_version = ""
+
+[role]
+title = "Expert front-end developer and UI/UX designer"
+objective = "Build a comprehensive, mobile-friendly financial portfolio dashboard."
+specialties = [
+  "React",
+  "Next.js",
+  "Tailwind CSS",
+  "shadcn/ui",
+  "financial dashboard UX",
+]
+
+[acknowledgement]
+required = true
+message = "Confirm understanding of the architectural requirements, metrics including YOC, PADI, and portfolio weighting, and the Professional FinTech design aesthetic before implementation."
+
+[design_system]
+aesthetic = "Professional FinTech"
+inspiration = [
+  "Google Finance",
+  "Stripe",
+]
+background = "Very subtle off-white or light gray application background."
+surface = "Stark white content cards."
+corners = "Use smooth, uniform rounded corners such as Tailwind rounded-xl."
+shadows = "Use soft, diffused shadows such as shadow-sm."
+density = "Compact, data-dense, professional layout with minimal excess padding."
+mobile = "Must be mobile-friendly and responsive."
+
+[typography]
+primary_font = "Inter"
+number_font = "JetBrains Mono"
+standard_text_size = "text-base"
+table_text_size = "text-sm"
+guidance = "Avoid massive default font sizes. Use monospace typography for all financial numbers so decimal points align in columns."
+
+[tech_stack]
+framework = "Next.js"
+routing = "Next.js file-based routing preferred"
+ui_runtime = "React"
+styling = "Tailwind CSS"
+component_system = "shadcn/ui"
+
+[architecture]
+modularity_required = true
+description = "Codebase must be strictly modular so UI, hooks, math, parsing, and utilities can be modified independently."
+component_directories = [
+  "components/cards",
+  "components/charts",
+  "components/tables",
+  "components/layout",
+  "hooks",
+  "lib/calculations",
+  "lib/parsing",
+  "lib/types",
+  "lib/mock-data",
+]
+
+[code_commenting]
+required = true
+scope = "Every code block, function, hook, utility, and major component must include clear, simple header comments and useful inline notes."
+style = "Plain English comments that make logic and styling easy to manually find and edit later."
+
+[data_ingestion]
+mode = "local_csv"
+source_file_location = "Project root folder"
+source_file_format = "Robinhood-formatted transaction log CSV"
+ui_coupling_allowed = false
+description = "CSV parsing logic must be completely decoupled from UI layers so alternative data sources can be mapped later."
+
+[external_data_placeholders]
+use_static_mock_data_for_now = true
+required_todos = [
+  "// TODO: Fetch Live Stock Price",
+  "// TODO: Fetch Live Dividend Yield",
+]
+guidance = "Clearly comment and isolate variables where live external market data will eventually be needed."
+
+[metrics]
+portfolio_value = "Total current market value of holdings plus cash where applicable."
+cash_balance = "Cash balance or buying power."
+total_pl_dollars = "Total profit or loss in dollars."
+total_pl_percent = "Total profit or loss as a percentage."
+padi = "Projected Annual Dividend Income based on dividend-paying holdings and placeholder dividend yield data."
+weighting = "Each holding market value divided by total portfolio value."
+yoc = "Yield on Cost based on the user's initial average cost."
+standard_average_cost = "Average paid cost before dividend reinvestment adjustments."
+adjusted_average_cost = "Average cost factoring in DRIP dividend reinvestment."
+drip_shares = "Total shares acquired solely through dividend reinvestment."
+drip_average_cost = "Average cost of only dividend-purchased shares."
+
+[[pages]]
+id = "dashboard"
+title = "Main Dashboard"
+route = "/"
+requirements = [
+  "Show Total Portfolio Value.",
+  "Show Cash Balance or Buying Power.",
+  "Show Total P/L in dollars and percent.",
+  "Show Projected Annual Dividend Income.",
+  "Render a clean line graph for portfolio trajectory.",
+  "Render a symmetrical donut chart for sector or asset allocation.",
+  "Render a dense holdings table.",
+]
+holdings_table_columns = [
+  "Ticker",
+  "Name",
+  "Shares rounded to 2 decimals",
+  "Portfolio Weight %",
+  "Average Price Paid",
+  "Total Cost",
+  "Current Share Price placeholder",
+  "Market Value",
+  "P/L $",
+  "P/L %",
+]
+
+[[pages]]
+id = "dividends"
+title = "Dividend Tracking"
+route = "/dividends"
+requirements = [
+  "Show dividend-paying holdings in the left column.",
+  "Show monthly payout columns.",
+  "Show Total to Date at the end of each row.",
+  "Include a global calendar-year toggle for payout comparison.",
+  "Display Standard Average Cost vs Adjusted Average Cost.",
+  "Display total DRIP-acquired shares.",
+  "Display isolated average cost of DRIP shares.",
+  "Display Yield on Cost.",
+  "Render a clean dividend calendar grid.",
+  "Render a bar graph for month-over-month and year-over-year payout growth.",
+]
+
+[[pages]]
+id = "drip_visualizer"
+title = "Historical DRIP Compounding Visualizer"
+route = "/drip"
+requirements = [
+  "Zero-input visualizer based entirely on parsed CSV data.",
+  "Calculate hypothetical past and future returns using asset inception date, TTM growth, and yield.",
+  "Compare Compounding with DRIP Active vs Compounding without DRIP.",
+  "Provide a stock selector.",
+  "Provide one horizontal Year Span slider below the graph.",
+  "Slider must smoothly update the X-axis and extend or shrink the calculated time span.",
+]
+
+[[pages]]
+id = "transactions"
+title = "Transaction History"
+route = "/transactions"
+requirements = [
+  "Render a searchable table mirroring the ingested Robinhood CSV data.",
+  "Render a filterable table for verification.",
+  "Keep table logic modular and reusable.",
+]
+
+[execution_plan]
+approval_required_before_phase_1_code = true
+phase_count = 6
+
+[[execution_plan.phases]]
+number = 0
+name = "Planning and confirmation"
+deliverables = [
+  "Acknowledge requirements.",
+  "Confirm understanding of YOC, PADI, weighting, DRIP metrics, architecture, and aesthetic.",
+  "Present phased implementation plan.",
+  "Wait for explicit approval before writing Phase 1 code.",
+]
+
+[[execution_plan.phases]]
+number = 1
+name = "Project scaffold and design foundation"
+deliverables = [
+  "Create Next.js app structure.",
+  "Install and configure Tailwind CSS and shadcn/ui.",
+  "Add global layout, typography, compact spacing, and base design tokens.",
+  "Create initial modular folder structure.",
+]
+
+[[execution_plan.phases]]
+number = 2
+name = "CSV ingestion and financial data model"
+deliverables = [
+  "Add Robinhood CSV parser isolated from UI.",
+  "Define normalized transaction, holding, dividend, and portfolio types.",
+  "Add utility functions for cost basis, shares, weighting, P/L, YOC, PADI, and DRIP calculations.",
+  "Add mock market data placeholders with required TODO comments.",
+]
+
+[[execution_plan.phases]]
+number = 3
+name = "Main dashboard"
+deliverables = [
+  "Build metric cards.",
+  "Build portfolio trajectory chart.",
+  "Build allocation donut chart.",
+  "Build dense holdings table.",
+]
+
+[[execution_plan.phases]]
+number = 4
+name = "Dividend tracking"
+deliverables = [
+  "Build dividend matrix table.",
+  "Add year comparison toggle.",
+  "Add DRIP and yield metric components.",
+  "Build dividend calendar grid.",
+  "Build payout growth bar chart.",
+]
+
+[[execution_plan.phases]]
+number = 5
+name = "DRIP visualizer"
+deliverables = [
+  "Build selected-stock compounding model.",
+  "Render DRIP vs non-DRIP graph.",
+  "Add Year Span slider.",
+  "Ensure graph updates smoothly from parsed data only.",
+]
+
+[[execution_plan.phases]]
+number = 6
+name = "Transaction history, QA, and Version 1.0"
+deliverables = [
+  "Build searchable and filterable transaction table.",
+  "Verify mobile responsiveness and dense desktop layout.",
+  "Run lint, typecheck, and build verification.",
+  "Once baseline is fully functional, explicitly designate the tracker as Version 1.0.",
+]
+
+[version_control]
+version_1_rule = "After the initial fully functional baseline is complete, designate it as Version 1.0 and use it as the stable reference point."
+breakage_rule = "If future feature additions or code adjustments break the app, immediately revert to Version 1.0 and try again."
+recommended_baseline_tag = "v1.0"
+commit_guidance = "Commit intentionally at phase boundaries after verification."

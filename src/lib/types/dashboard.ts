@@ -3,6 +3,8 @@ import type { LucideIcon } from "lucide-react";
 // Defines the compact metric card values shown on dashboard surfaces.
 export type MetricCardValue = {
   label: string;
+  fullTitle: string;
+  description: string;
   value: string;
   delta: string;
   tone: "positive" | "neutral" | "warning";
@@ -27,4 +29,6 @@ export type HoldingPreview = {
 export type ChartPoint = {
   label: string;
   value: number;
+  amount: number;
+  displayValue: string;
 };

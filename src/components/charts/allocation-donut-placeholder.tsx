@@ -1,7 +1,8 @@
-import { allocationSegments } from "@/lib/mock-data/phase-one-dashboard";
+import type { AllocationSegment } from "@/lib/types/portfolio";
 
 // AllocationDonutPlaceholder renders a balanced allocation visual using CSS conic gradients.
-export function AllocationDonutPlaceholder() {
+export function AllocationDonutPlaceholder({ segments }: { segments: AllocationSegment[] }) {
+  const allocationSegments = segments.length > 0 ? segments : [{ label: "Cash", value: 100, color: "#64748b" }];
   const gradientStops = allocationSegments
     .map((segment, index) => {
       // Sum earlier segment values to find the current conic-gradient start point.
@@ -15,7 +16,7 @@ export function AllocationDonutPlaceholder() {
     .join(", ");
 
   return (
-    <section className="rounded-xl border bg-card p-3 shadow-sm">
+    <section className="rounded-xl border bg-card/90 p-3 shadow-[0_18px_45px_rgba(0,0,0,0.20)]">
       <div className="mb-3">
         <h2 className="text-base font-semibold">Allocation</h2>
         <p className="text-xs text-muted-foreground">Sector and cash weighting</p>
@@ -27,7 +28,7 @@ export function AllocationDonutPlaceholder() {
           role="img"
           aria-label="Portfolio allocation donut chart"
         >
-          <div className="absolute inset-7 rounded-full bg-card shadow-inner" />
+          <div className="absolute inset-7 rounded-full bg-card shadow-[inset_0_0_28px_rgba(0,0,0,0.24)]" />
           <div className="absolute inset-0 flex flex-col items-center justify-center">
             <span className="font-mono text-lg font-semibold">100%</span>
             <span className="text-xs text-muted-foreground">Allocated</span>

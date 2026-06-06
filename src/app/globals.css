@@ -2,22 +2,22 @@
 @import "tw-animate-css";
 
 :root {
-  --background: #f6f7f9;
-  --foreground: #111827;
-  --card: #ffffff;
-  --card-foreground: #111827;
-  --muted: #eef1f4;
-  --muted-foreground: #64748b;
-  --border: #e5e7eb;
-  --input: #e5e7eb;
-  --primary: #111827;
-  --primary-foreground: #ffffff;
-  --secondary: #f1f5f9;
-  --secondary-foreground: #1f2937;
-  --accent: #eaf6ef;
-  --accent-foreground: #166534;
-  --destructive: #dc2626;
-  --ring: #94a3b8;
+  --background: #171724;
+  --foreground: #f3f6ff;
+  --card: #252537;
+  --card-foreground: #f3f6ff;
+  --muted: #303044;
+  --muted-foreground: #9ba3b8;
+  --border: #38384d;
+  --input: #38384d;
+  --primary: #38d5ff;
+  --primary-foreground: #08111c;
+  --secondary: #2c2c40;
+  --secondary-foreground: #dce5ff;
+  --accent: #31244f;
+  --accent-foreground: #b78cff;
+  --destructive: #ff6176;
+  --ring: #38d5ff;
   --radius: 0.75rem;
 }
 
@@ -49,12 +49,72 @@
 }
 
 body {
-  background: var(--background);
+  background:
+    linear-gradient(135deg, #11111a 0%, #171724 46%, #202035 100%);
   color: var(--foreground);
   font-family: var(--font-inter), Arial, Helvetica, sans-serif;
+  overflow-x: hidden;
+}
+
+::selection {
+  background: rgba(56, 213, 255, 0.28);
+  color: var(--foreground);
 }
 
 button,
 a {
   -webkit-tap-highlight-color: transparent;
+}
+
+.pill-scrollbar {
+  scrollbar-color: rgba(56, 213, 255, 0.7) transparent;
+  scrollbar-width: thin;
+}
+
+.pill-scrollbar::-webkit-scrollbar {
+  height: 6px;
+  width: 6px;
+}
+
+.pill-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 999px;
+}
+
+.pill-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #38d5ff, #7c3aed);
+  border-radius: 999px;
+}
+
+.pill-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #6fe4ff, #9b5cff);
+}
+
+.pill-scrollbar::-webkit-scrollbar-button {
+  display: none;
+  height: 0;
+  width: 0;
+}
+
+.pill-scrollbar::-webkit-scrollbar-button:horizontal {
+  display: none;
+  height: 0;
+  width: 0;
+}
+
+.pill-scrollbar::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.scroll-glow::after {
+  background: linear-gradient(180deg, rgba(37, 37, 55, 0), rgba(56, 213, 255, 0.16));
+  bottom: 0;
+  content: "";
+  display: block;
+  height: 24px;
+  left: 0;
+  margin-top: -24px;
+  pointer-events: none;
+  position: sticky;
+  right: 0;
 }

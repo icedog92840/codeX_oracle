@@ -4,7 +4,7 @@ Compact local financial portfolio dashboard built with Next.js, React, Tailwind 
 
 ## Current Status
 
-Phase 1 is complete:
+Phase 2 is complete:
 
 - Next.js App Router scaffold
 - Tailwind CSS design tokens
@@ -12,6 +12,10 @@ Phase 1 is complete:
 - Compact fintech app shell
 - Dashboard, Dividends, DRIP, and Transactions routes
 - Modular folders for cards, charts, tables, layout, hooks, calculations, parsing, types, and mock data
+- Local Robinhood CSV parsing from `Transaction_Log.csv`
+- Normalized transaction model
+- Portfolio holding, weighting, P/L, cash, and PADI calculations
+- Isolated static market-data placeholders for future live stock price and dividend yield APIs
 
 ## Local Commands
 

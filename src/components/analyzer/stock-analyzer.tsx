@@ -577,7 +577,7 @@ function PriceChart({ scan }: { scan: AnalyzerScan }) {
         </div>
         <p className="font-mono text-xs text-muted-foreground">{formatCurrency(scan.price)}</p>
       </div>
-      <svg className="h-64 w-full overflow-visible" viewBox="0 0 720 260" role="img" aria-label={`${scan.ticker} mock price chart`}>
+      <svg className="h-64 w-full overflow-visible" viewBox="0 0 720 260" role="img" aria-label={`${scan.ticker} price setup chart`}>
         <line x1="48" x2="700" y1={chart.supportY} y2={chart.supportY} stroke="#25e0bf" strokeDasharray="5 6" opacity="0.6" />
         <line x1="48" x2="700" y1={chart.resistanceY} y2={chart.resistanceY} stroke="#bd1dff" strokeDasharray="5 6" opacity="0.6" />
         {chart.grid.map((line) => (
@@ -604,7 +604,7 @@ function TechnicalSummary({ scan }: { scan: AnalyzerScan }) {
       <h3 className="text-base font-semibold">Technical Summary</h3>
       <p className="mt-3 text-sm leading-6 text-muted-foreground">{scan.summary}</p>
       <p className="mt-3 rounded-xl border bg-[#191929] p-3 text-xs text-muted-foreground">
-        This is a local technical setup model using mock OHLC data. It is not a buy or sell recommendation.
+        This is a local technical setup model using cached provider candles when available and deterministic fallback candles when needed. It is not a buy or sell recommendation.
       </p>
     </section>
   );

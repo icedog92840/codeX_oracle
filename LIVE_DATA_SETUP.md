@@ -4,9 +4,9 @@ The app is local-first. Live provider calls are disabled unless the matching env
 
 ## Recommended Free Stack
 
-- Twelve Data: quotes and daily OHLC candles.
+- Twelve Data: quotes and daily OHLC candles for analyzer scans.
 - SEC EDGAR: company facts and value-investor fundamentals.
-- Financial Modeling Prep: optional fallback quote/news provider.
+- Financial Modeling Prep: recommended first news provider and optional quote fallback.
 - Alpha Vantage: optional fallback daily OHLC provider with a very small free daily budget.
 - RSS: optional configurable headline feed.
 
@@ -82,6 +82,8 @@ That route keeps API keys on the server and returns a cached research snapshot:
 
 If a provider is not configured, it returns only the data available from configured providers.
 
+The `/data-providers` page includes a Research Test Harness that calls this route from the browser and summarizes quote, OHLC, fundamentals, news, source tags, and cache freshness. Use **Test** for cache-first checks and **Refresh** after keys are added to force a budget-guarded provider refresh.
+
 ## SQLite Storage
 
 The local database is ignored by Git and can store:
@@ -111,3 +113,5 @@ The analyzer currently combines:
 - News/filing context
 
 The Graham/Buffett inputs now use SEC fundamentals when configured and fall back to deterministic local estimates for missing fields. Technical indicators are kept as a small timing layer, not the main owner-grade score.
+
+Analyzer OHLC is research-first: it uses cached provider candles from `/api/research/[ticker]` when available and falls back to deterministic local candles when providers are missing or return too little usable history.

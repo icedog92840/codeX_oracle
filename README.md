@@ -13,7 +13,7 @@ The app is past the original Version 1.0 baseline and is currently tagged at `v1
 - Portfolio holdings, weighting, unrealized P/L, dividends paid, and PADI calculations.
 - Dividend matrix, dividend cards, payout charts, DRIP metrics, and historical payout popouts.
 - Paged/filterable transaction verification with mobile stacked cards.
-- Local mock-OHLC stock analyzer with technical indicators, Graham/Buffett owner scoring, SQLite-backed watchlist mirroring, and saved scan snapshot drawer.
+- Research-first stock analyzer with provider OHLC fallback handling, technical indicators, Graham/Buffett owner scoring, SQLite-backed watchlist mirroring, and saved scan snapshot drawer.
 - Isolated market-data provider resolver for future live stock price and dividend yield APIs.
 - Isolated analyzer-data provider resolver for future live historical OHLC APIs.
 - Server-only external-data scaffolding with SQLite cache, free-tier budgets, and `/api/research/[ticker]`.
@@ -24,7 +24,7 @@ The app is past the original Version 1.0 baseline and is currently tagged at `v1
 - Market prices/yields: Local placeholders only. The provider interface lives in `src/lib/market-data`.
 - Analyzer OHLC candles: Cached provider candles when configured, with deterministic local mock fallback. The provider interface lives in `src/lib/analyzer`. No external indicator API is used.
 - Analyzer value metrics: SEC fundamentals when configured, with deterministic local estimates as fallback.
-- Future live research data: See `LIVE_DATA_SETUP.md` for Twelve Data, SEC EDGAR, FMP, Alpha Vantage, RSS, SQLite cache TTLs, and API-budget safety.
+- Live research setup: See `LIVE_DATA_SETUP.md` for Twelve Data, SEC EDGAR, FMP, Alpha Vantage, RSS, SQLite cache TTLs, API-budget safety, and the `/data-providers` research test harness.
 
 ## Local Commands
 

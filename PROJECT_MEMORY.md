@@ -14,7 +14,7 @@ This file preserves the current project state for future Codex turns if chat con
   - `/dividends` dividend tracker
   - `/drip` DRIP compounding visualizer
   - `/transactions` paged transaction verifier
-  - `/analyzer` local mock-OHLC stock analyzer
+  - `/analyzer` research-first stock analyzer with mock OHLC fallback
   - `/data-providers` provider setup and cache/budget status
 
 ## Completed Highlights
@@ -44,7 +44,7 @@ This file preserves the current project state for future Codex turns if chat con
   - Mobile navigation is a floating bottom bar with short labels.
 - Dividend ticker popouts now show the highest historical dividend payout received for that ticker across the full CSV, plus the last three historical dividend payments.
 - Stock Analyzer page added after Version 1.0:
-  - Deterministic mock OHLC provider for 200 daily candles.
+  - Research-first analyzer provider using cached `/api/research` OHLC when configured, with deterministic mock OHLC fallback for 200 daily candles.
   - Local SMA, support/resistance, RSI, and MACD calculations.
   - Transparent 0-100 technical scoring, A-F grade, signal chips, score breakdown, and rule-based summary.
   - Graham Defensive, Buffett Quality, and combined Owner Grade scorecards with metric popout explanations.
@@ -65,6 +65,7 @@ This file preserves the current project state for future Codex turns if chat con
   - `/api/research/[ticker]?refresh=1` for budget-guarded provider refreshes.
   - Server routes `/api/analyzer/scans` and `/api/watchlist` for SQLite-backed scan and watchlist persistence.
   - Server route `/api/analyzer/snapshot/[ticker]` for saved scan history plus cached news.
+  - `/data-providers` includes an isolated Research Test Harness for checking `/api/research/[ticker]` quote, OHLC, fundamentals, news, source tags, and cache freshness.
   - `.env.example` lists every key-ready provider variable while `.env.local` remains ignored.
   - FMP is the recommended free-first news path; RSS remains a no-cost fallback if FMP news is gated.
   - Setup notes in `LIVE_DATA_SETUP.md`.
@@ -82,7 +83,7 @@ This file preserves the current project state for future Codex turns if chat con
 
 1. Add provider keys to `.env.local`, restart the dev server, and test `/api/research/[ticker]?refresh=1`.
 2. Confirm FMP headlines save into SQLite and display with provider source tags in the snapshot drawer.
-3. Wire live/cached quote and OHLC into analyzer scans while keeping mock fallback.
+3. Confirm analyzer scans use provider OHLC instead of mock fallback once Twelve Data or Alpha Vantage keys are configured.
 4. Improve Graham/Buffett scoring with more real multi-year fundamentals after provider coverage is proven.
 
 ## Verification Commands

@@ -358,7 +358,7 @@ function readAnalyzerSnapshot(storageSnapshot: string): InsightRoutePayload | nu
       briefings: [
         bestSaved ? `${bestSaved.ticker} is the strongest saved analyzer scan at ${bestSaved.grade} / ${bestSaved.score}.` : "Save analyzer scans to build a local watchlist with scores and grades.",
         lastScan ? `The most recent analyzer scan stored in this browser is ${lastScan.ticker}.` : "Recent scans will appear after the first local technical analysis run.",
-        "Analyzer results remain local and use mock OHLC data until a live market-data feed is connected.",
+        "Analyzer results remain local, prefer cached research candles when configured, and fall back to mock OHLC when provider data is unavailable.",
       ],
     };
   } catch {

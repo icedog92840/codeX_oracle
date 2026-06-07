@@ -129,7 +129,8 @@ function isCashDividend(transaction: NormalizedTransaction) {
 
 // isDividendReinvestment identifies buy rows created by dividend reinvestment.
 function isDividendReinvestment(transaction: NormalizedTransaction) {
-  return transaction.transCode === "Buy" && transaction.description.toLowerCase().includes("dividend reinvestment");
+  const description = transaction.description.toLowerCase();
+  return (transaction.transCode === "Buy" && description.includes("dividend reinvestment")) || (transaction.transCode === "BCXL" && description.includes("drip"));
 }
 
 // sumAmounts totals positive transaction amounts.
@@ -210,7 +211,7 @@ function buildDripStats(transactions: NormalizedTransaction[]) {
       return;
     }
 
-    if (transaction.transCode === "Buy") {
+    if (isBuyLike(transaction.transCode)) {
       nonDripCostByTicker.set(transaction.ticker, (nonDripCostByTicker.get(transaction.ticker) ?? 0) + Math.abs(transaction.amount ?? 0));
     }
 
@@ -234,4 +235,9 @@ function buildDripStats(transactions: NormalizedTransaction[]) {
     highestYieldOnCost,
     dripAssetCount: dripByTicker.size,
   };
+}
+
+// isBuyLike identifies normal buys plus Robinhood correction rows that increase shares with basis.
+function isBuyLike(code: string) {
+  return ["Buy", "BCXL"].includes(code);
 }

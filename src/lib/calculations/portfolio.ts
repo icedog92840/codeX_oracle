@@ -237,7 +237,7 @@ function estimateYieldFromDividendDollars(trailingDividendDollars = 0, marketVal
 
 // isBuyLike identifies transaction codes that increase shares with cost basis.
 function isBuyLike(code: string) {
-  return ["Buy"].includes(code);
+  return ["Buy", "BCXL"].includes(code);
 }
 
 // isSellLike identifies transaction codes that decrease shares and reduce cost basis.

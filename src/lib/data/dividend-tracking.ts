@@ -379,7 +379,7 @@ function buildDividendHoldingMetrics(transactions: NormalizedTransaction[]) {
         return;
       }
 
-      if (transaction.transCode === "Buy") {
+      if (isBuyLike(transaction.transCode)) {
         applyBuy(metric, transaction);
       }
 
@@ -475,9 +475,15 @@ function isShareMovement(code: string) {
   return ["ACATO", "CONV", "MRGS", "REC", "SDIV", "SOFF", "SPL", "SPR", "SXCH"].includes(code);
 }
 
+// isBuyLike identifies normal buys plus Robinhood correction rows that increase shares with basis.
+function isBuyLike(code: string) {
+  return ["Buy", "BCXL"].includes(code);
+}
+
 // isDividendReinvestment identifies DRIP buy rows exported by Robinhood.
 function isDividendReinvestment(transaction: NormalizedTransaction) {
-  return transaction.transCode === "Buy" && transaction.description.toLowerCase().includes("dividend reinvestment");
+  const description = transaction.description.toLowerCase();
+  return (transaction.transCode === "Buy" && description.includes("dividend reinvestment")) || (transaction.transCode === "BCXL" && description.includes("drip"));
 }
 
 // buildMonths totals selected-year dividends by month for the bar chart.

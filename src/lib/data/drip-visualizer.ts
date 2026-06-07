@@ -168,7 +168,7 @@ function applyHistoricalTransaction(state: TickerReplayState, transaction: Norma
     state.latestPrice = transaction.price;
   }
 
-  if (transaction.transCode === "Buy" && transaction.quantity !== null) {
+  if (isBuyLike(transaction.transCode) && transaction.quantity !== null) {
     state.withShares += transaction.quantity;
 
     if (isDividendReinvestment(transaction)) {
@@ -360,12 +360,18 @@ function isCashDividend(transaction: NormalizedTransaction) {
 
 // isDividendReinvestment identifies DRIP buy rows exported by Robinhood.
 function isDividendReinvestment(transaction: NormalizedTransaction) {
-  return transaction.transCode === "Buy" && transaction.description.toLowerCase().includes("dividend reinvestment");
+  const description = transaction.description.toLowerCase();
+  return (transaction.transCode === "Buy" && description.includes("dividend reinvestment")) || (transaction.transCode === "BCXL" && description.includes("drip"));
 }
 
 // isShareMovement identifies Robinhood rows that change shares without normal buy or sell semantics.
 function isShareMovement(code: string) {
   return ["ACATO", "CONV", "MRGS", "REC", "SDIV", "SOFF", "SPL", "SPR", "SXCH"].includes(code);
+}
+
+// isBuyLike identifies normal buys plus Robinhood correction rows that increase shares with basis.
+function isBuyLike(code: string) {
+  return ["Buy", "BCXL"].includes(code);
 }
 
 // extractName keeps ticker labels readable from Robinhood descriptions.

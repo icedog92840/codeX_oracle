@@ -16,7 +16,7 @@ const loadingMessages = [
   "Generating technical grade...",
 ];
 
-// StorageKeys isolate browser localStorage names for future migration to a file or database store.
+// StorageKeys isolate browser localStorage names used as a fast fallback beside SQLite persistence.
 const storageKeys = {
   recentScans: "codex-oracle.analyzer.recent-scans",
   watchlist: "codex-oracle.analyzer.watchlist",
@@ -37,6 +37,7 @@ export function StockAnalyzer() {
     window.queueMicrotask(() => {
       setRecentScans(readStoredArray<AnalyzerScan>(storageKeys.recentScans));
       setWatchlist(readStoredWatchlist());
+      void hydrateDatabaseWatchlist(setWatchlist);
     });
   }, []);
 
@@ -83,6 +84,7 @@ export function StockAnalyzer() {
       setScan(result);
       setRecentScans((currentScans) => storeRecentScans([result, ...currentScans]));
       setWatchlist((currentWatchlist) => refreshWatchlistScan(currentWatchlist, result));
+      void persistAnalyzerScan(result);
     } catch {
       setError("The analyzer data provider could not return an OHLC payload for that ticker.");
     } finally {
@@ -98,16 +100,18 @@ export function StockAnalyzer() {
 
     setWatchlist((currentWatchlist) => {
       const alreadySaved = currentWatchlist.some((item) => item.ticker === scan.ticker);
+      const savedItem = buildWatchlistItemFromScan(scan);
       const nextWatchlist = alreadySaved
         ? currentWatchlist.filter((item) => item.ticker !== scan.ticker)
         : [
             {
-              ...buildWatchlistItemFromScan(scan),
+              ...savedItem,
             },
             ...currentWatchlist,
           ];
 
       window.localStorage.setItem(storageKeys.watchlist, JSON.stringify(nextWatchlist));
+      void (alreadySaved ? deletePersistedWatchlistItem(scan.ticker) : persistWatchlistItem(savedItem));
       return nextWatchlist;
     });
   }
@@ -118,6 +122,7 @@ export function StockAnalyzer() {
       const nextWatchlist = currentWatchlist.filter((item) => item.ticker !== ticker);
 
       window.localStorage.setItem(storageKeys.watchlist, JSON.stringify(nextWatchlist));
+      void deletePersistedWatchlistItem(ticker);
       return nextWatchlist;
     });
   }
@@ -377,7 +382,7 @@ function RecentScansPanel({
       <div className="flex items-center justify-between gap-3">
         <div>
           <h3 className="text-base font-semibold">Recent Scans</h3>
-          <p className="text-xs text-muted-foreground">Stored in this browser</p>
+          <p className="text-xs text-muted-foreground">Saved locally with browser fallback</p>
         </div>
         <button className="rounded-xl border p-2 text-muted-foreground transition-colors hover:text-foreground" onClick={onClear} type="button" aria-label="Clear recent scans">
           <Trash2 className="size-4" aria-hidden="true" />
@@ -425,7 +430,7 @@ function WatchlistPanel({
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-base font-semibold">Watchlist</h3>
-          <p className="text-xs text-muted-foreground">Saved scan snapshots in this browser</p>
+          <p className="text-xs text-muted-foreground">Saved scan snapshots in local SQLite</p>
         </div>
         <span className="rounded-full border bg-[#191929] px-2 py-1 font-mono text-[10px] text-muted-foreground">{watchlist.length} saved</span>
       </div>
@@ -539,6 +544,90 @@ function storeRecentScans(scans: AnalyzerScan[]) {
   return nextScans;
 }
 
+// hydrateDatabaseWatchlist merges SQLite-backed saved tickers into the browser watchlist state.
+async function hydrateDatabaseWatchlist(setWatchlist: (updater: (currentWatchlist: WatchlistItem[]) => WatchlistItem[]) => void) {
+  try {
+    const response = await fetch("/api/watchlist");
+
+    if (!response.ok) {
+      return;
+    }
+
+    const payload = await response.json() as { items?: WatchlistItem[] };
+    const databaseItems = Array.isArray(payload.items) ? payload.items : [];
+
+    if (databaseItems.length === 0) {
+      return;
+    }
+
+    setWatchlist((currentWatchlist) => {
+      const merged = mergeWatchlistItems(currentWatchlist, databaseItems);
+      window.localStorage.setItem(storageKeys.watchlist, JSON.stringify(merged));
+      return merged;
+    });
+  } catch {
+    return;
+  }
+}
+
+// persistAnalyzerScan mirrors one completed scan into SQLite without blocking the UI.
+async function persistAnalyzerScan(scan: AnalyzerScan) {
+  try {
+    await fetch("/api/analyzer/scans", {
+      body: JSON.stringify({ scan }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+  } catch {
+    return;
+  }
+}
+
+// persistWatchlistItem mirrors one saved watchlist row into SQLite.
+async function persistWatchlistItem(item: WatchlistItem) {
+  try {
+    await fetch("/api/watchlist", {
+      body: JSON.stringify({
+        companyName: item.companyName,
+        latestScanId: item.latestScanId,
+        ticker: item.ticker,
+      }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+  } catch {
+    return;
+  }
+}
+
+// deletePersistedWatchlistItem mirrors watchlist removal into SQLite.
+async function deletePersistedWatchlistItem(ticker: string) {
+  try {
+    await fetch("/api/watchlist", {
+      body: JSON.stringify({ ticker }),
+      headers: { "Content-Type": "application/json" },
+      method: "DELETE",
+    });
+  } catch {
+    return;
+  }
+}
+
+// mergeWatchlistItems combines database and browser watchlists by ticker, preferring newest scan dates.
+function mergeWatchlistItems(browserItems: WatchlistItem[], databaseItems: WatchlistItem[]) {
+  const itemsByTicker = new Map<string, WatchlistItem>();
+
+  [...databaseItems, ...browserItems].forEach((item) => {
+    const existingItem = itemsByTicker.get(item.ticker);
+
+    if (!existingItem || new Date(item.lastScannedAt).getTime() > new Date(existingItem.lastScannedAt).getTime()) {
+      itemsByTicker.set(item.ticker, item);
+    }
+  });
+
+  return Array.from(itemsByTicker.values()).sort((left, right) => new Date(right.lastScannedAt).getTime() - new Date(left.lastScannedAt).getTime());
+}
+
 // refreshWatchlistScan updates a saved ticker with the newest scan while leaving unsaved tickers alone.
 function refreshWatchlistScan(watchlist: WatchlistItem[], scan: AnalyzerScan) {
   if (!watchlist.some((item) => item.ticker === scan.ticker)) {
@@ -548,6 +637,7 @@ function refreshWatchlistScan(watchlist: WatchlistItem[], scan: AnalyzerScan) {
   const nextWatchlist = watchlist.map((item) => (item.ticker === scan.ticker ? buildWatchlistItemFromScan(scan, item) : item));
 
   window.localStorage.setItem(storageKeys.watchlist, JSON.stringify(nextWatchlist));
+  void persistWatchlistItem(buildWatchlistItemFromScan(scan, watchlist.find((item) => item.ticker === scan.ticker)));
   return nextWatchlist;
 }
 

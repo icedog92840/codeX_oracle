@@ -58,6 +58,11 @@ export function getRecentAnalyzerScans(ticker: string, limit = 10) {
     .all();
 }
 
+// getAnalyzerScanById returns one saved scan row by primary key.
+export function getAnalyzerScanById(id: string) {
+  return getDatabase().select().from(analyzerScans).where(eq(analyzerScans.id, id)).get();
+}
+
 // upsertWatchlistItem saves a ticker in the local database-backed watchlist.
 export function upsertWatchlistItem({
   companyName,
@@ -93,6 +98,16 @@ export function upsertWatchlistItem({
       target: watchlistItems.ticker,
     })
     .run();
+}
+
+// listWatchlistItems returns every database-backed watchlist row, newest updated first.
+export function listWatchlistItems() {
+  return getDatabase().select().from(watchlistItems).orderBy(desc(watchlistItems.updatedAt)).all();
+}
+
+// deleteWatchlistItem removes one database-backed watchlist row.
+export function deleteWatchlistItem(ticker: string) {
+  getDatabase().delete(watchlistItems).where(eq(watchlistItems.ticker, normalizeTicker(ticker))).run();
 }
 
 // saveNewsItems stores ticker headlines so news refreshes can respect cache windows.

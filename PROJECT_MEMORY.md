@@ -46,7 +46,7 @@ This file preserves the current project state for future Codex turns if chat con
   - Deterministic mock OHLC provider for 200 daily candles.
   - Local SMA, support/resistance, RSI, and MACD calculations.
   - Transparent 0-100 technical scoring, A-F grade, signal chips, score breakdown, and rule-based summary.
-  - Browser localStorage recent scans and watchlist.
+  - Browser localStorage recent scans and watchlist, mirrored into SQLite for durability.
   - Analyzer added to desktop nav and mobile bottom nav as `Scan`.
 - Analyzer data now resolves through `src/lib/analyzer/analyzer-data-resolver.ts` and `analyzer-data-settings.ts`.
 - The active analyzer provider remains `mock`; selecting `live` intentionally errors until a real historical OHLC provider is connected.
@@ -58,6 +58,7 @@ This file preserves the current project state for future Codex turns if chat con
   - Future-ready tables for analyzer scans, watchlist items, news, CSV imports, and app settings.
   - Provider adapters for Twelve Data, SEC EDGAR, Alpha Vantage, FMP, and configurable RSS news.
   - Server route `/api/research/[ticker]` for cached quote/candles/fundamentals/news without exposing API keys.
+  - Server routes `/api/analyzer/scans` and `/api/watchlist` for SQLite-backed scan and watchlist persistence.
   - Setup notes in `LIVE_DATA_SETUP.md`.
 - Mobile dividend payout chart tooltip overflow was fixed by making first/last bar popovers align inward.
 
@@ -73,7 +74,7 @@ This file preserves the current project state for future Codex turns if chat con
 1. Keep the app local-first while preparing clean extension points for future live data.
 2. Add a dedicated settings/data page for provider choices, cache status, and assumptions if the top-ribbon Data popout becomes too compact.
 3. Wire analyzer UI to `/api/research/[ticker]` only after API keys/env are configured and the fallback behavior is reviewed.
-4. Watchlist/recent scans can later move from browser localStorage to file/SQLite storage if persistence needs to survive browser clearing.
+4. Add a ticker-click scan snapshot drawer that reads saved SQLite scans and related news.
 
 ## Verification Commands
 

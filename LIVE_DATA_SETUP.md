@@ -76,6 +76,13 @@ The local database is ignored by Git and can store:
 - CSV import fingerprints
 - app settings
 
+Analyzer scans and watchlist add/remove actions are mirrored through:
+
+```text
+/api/analyzer/scans
+/api/watchlist
+```
+
 ## Analyzer Direction
 
 The future improved analyzer should combine:

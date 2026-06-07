@@ -13,7 +13,7 @@ The app is past the original Version 1.0 baseline and is currently tagged at `v1
 - Portfolio holdings, weighting, unrealized P/L, dividends paid, and PADI calculations.
 - Dividend matrix, dividend cards, payout charts, DRIP metrics, and historical payout popouts.
 - Paged/filterable transaction verification with mobile stacked cards.
-- Local mock-OHLC stock analyzer with technical indicators, scoring, recent scans, and watchlist.
+- Local mock-OHLC stock analyzer with technical indicators, scoring, recent scans, and SQLite-backed watchlist mirroring.
 - Isolated market-data provider resolver for future live stock price and dividend yield APIs.
 - Isolated analyzer-data provider resolver for future live historical OHLC APIs.
 - Server-only external-data scaffolding with SQLite cache, free-tier budgets, and `/api/research/[ticker]`.

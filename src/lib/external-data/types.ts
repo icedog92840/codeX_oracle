@@ -39,8 +39,13 @@ export type HistoricalOhlc = {
 // FundamentalSnapshot stores value-investor metrics derived from public filings or fundamentals APIs.
 export type FundamentalSnapshot = {
   ticker: string;
+  currentAssets?: number;
+  currentLiabilities?: number;
+  grossProfit?: number;
   revenue?: number;
+  revenueGrowth?: number;
   netIncome?: number;
+  operatingIncome?: number;
   totalAssets?: number;
   totalLiabilities?: number;
   shareholderEquity?: number;

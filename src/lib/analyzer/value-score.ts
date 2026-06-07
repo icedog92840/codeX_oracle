@@ -1,17 +1,19 @@
 import type { OhlcCandle, ValueMetric, ValueScore, ValueScorecard } from "@/lib/analyzer/types";
+import type { FundamentalSnapshot } from "@/lib/external-data/types";
 
-// ValueScoreInput stores the local fields used to estimate Graham/Buffett style scores.
+// ValueScoreInput stores the fields used to build Graham/Buffett style scores.
 type ValueScoreInput = {
   candles: OhlcCandle[];
   dividendYield: number;
+  fundamentals?: FundamentalSnapshot;
   price: number;
   technicalScore: number;
   ticker: string;
 };
 
-// buildValueScorecard creates local Graham/Buffett style scores until live fundamentals are connected.
-export function buildValueScorecard({ candles, dividendYield, price, technicalScore, ticker }: ValueScoreInput): ValueScorecard {
-  const fundamentals = buildEstimatedFundamentals({ candles, dividendYield, price, ticker });
+// buildValueScorecard creates Graham/Buffett style scores from live filing data when available, then local fallbacks.
+export function buildValueScorecard({ candles, dividendYield, fundamentals: liveFundamentals, price, technicalScore, ticker }: ValueScoreInput): ValueScorecard {
+  const fundamentals = buildScoringFundamentals({ candles, dividendYield, fundamentals: liveFundamentals, price, ticker });
   const graham = buildGrahamScore(fundamentals);
   const buffett = buildBuffettScore(fundamentals);
   const ownerScore = Math.round(graham.score * 0.42 + buffett.score * 0.48 + technicalScore * 0.1);
@@ -25,8 +27,8 @@ export function buildValueScorecard({ candles, dividendYield, price, technicalSc
   };
 }
 
-// EstimatedFundamentals stores deterministic local placeholders for value scoring.
-type EstimatedFundamentals = {
+// ScoringFundamentals stores normalized value inputs used by the Graham/Buffett scoring formulas.
+type ScoringFundamentals = {
   bookValuePerShare: number;
   currentRatio: number;
   debtToEquity: number;
@@ -39,10 +41,11 @@ type EstimatedFundamentals = {
   price: number;
   returnOnEquity: number;
   revenueGrowth: number;
+  sourceLabel: string;
 };
 
 // buildEstimatedFundamentals derives stable placeholder fundamentals from price history and ticker seed.
-function buildEstimatedFundamentals({ candles, dividendYield, price, ticker }: Omit<ValueScoreInput, "technicalScore">): EstimatedFundamentals {
+function buildEstimatedFundamentals({ candles, dividendYield, price, ticker }: Omit<ValueScoreInput, "fundamentals" | "technicalScore">): ScoringFundamentals {
   const seed = hashTicker(ticker);
   const closes = candles.map((candle) => candle.close);
   const firstClose = closes[0] ?? price;
@@ -72,17 +75,56 @@ function buildEstimatedFundamentals({ candles, dividendYield, price, ticker }: O
     price,
     returnOnEquity,
     revenueGrowth,
+    sourceLabel: "local deterministic estimates from mock OHLC until filing data exists",
+  };
+}
+
+// buildScoringFundamentals merges real provider fundamentals with deterministic fallbacks.
+function buildScoringFundamentals({ candles, dividendYield, fundamentals, price, ticker }: Omit<ValueScoreInput, "technicalScore">): ScoringFundamentals {
+  const fallback = buildEstimatedFundamentals({ candles, dividendYield, price, ticker });
+
+  if (!fundamentals) {
+    return fallback;
+  }
+
+  const eps = safeDivide(fundamentals.netIncome, fundamentals.sharesOutstanding) ?? fallback.eps;
+  const peRatio = eps > 0 ? price / eps : fallback.peRatio;
+  const bookValuePerShare =
+    fundamentals.bookValuePerShare ??
+    safeDivide(fundamentals.shareholderEquity, fundamentals.sharesOutstanding) ??
+    fallback.bookValuePerShare;
+  const currentRatio = safeDivide(fundamentals.currentAssets, fundamentals.currentLiabilities) ?? fallback.currentRatio;
+  const debtToEquity = fundamentals.debtToEquity ?? safeDivide(fundamentals.longTermDebt, fundamentals.shareholderEquity) ?? fallback.debtToEquity;
+  const returnOnEquity = fundamentals.returnOnEquity ?? safeDivide(fundamentals.netIncome, fundamentals.shareholderEquity) ?? fallback.returnOnEquity;
+  const freeCashFlowPerShare = safeDivide(fundamentals.freeCashFlow, fundamentals.sharesOutstanding);
+  const freeCashFlowYield = freeCashFlowPerShare !== undefined ? freeCashFlowPerShare / Math.max(price, 1) : fallback.freeCashFlowYield;
+  const grossMargin = safeDivide(fundamentals.grossProfit, fundamentals.revenue) ?? fallback.grossMargin;
+  const operatingMargin = safeDivide(fundamentals.operatingIncome, fundamentals.revenue) ?? fallback.operatingMargin;
+
+  return {
+    ...fallback,
+    bookValuePerShare,
+    currentRatio,
+    debtToEquity,
+    eps,
+    freeCashFlowYield,
+    grossMargin,
+    operatingMargin,
+    peRatio,
+    returnOnEquity,
+    revenueGrowth: fundamentals.revenueGrowth ?? fallback.revenueGrowth,
+    sourceLabel: `${fundamentals.source} fundamentals where available, local estimates for any missing fields`,
   };
 }
 
 // buildGrahamScore grades defensive value, balance-sheet strength, and margin of safety.
-function buildGrahamScore(fundamentals: EstimatedFundamentals): ValueScore {
+function buildGrahamScore(fundamentals: ScoringFundamentals): ValueScore {
   const grahamNumber = Math.sqrt(22.5 * fundamentals.eps * fundamentals.bookValuePerShare);
   const grahamDiscount = (grahamNumber - fundamentals.price) / Math.max(fundamentals.price, 1);
   const metrics: ValueMetric[] = [
     buildMetric({
       description: "Lower P/E means the stock price is cheaper compared with the company's earnings. Graham generally preferred reasonable prices, not exciting stories.",
-      formula: "P/E = Current share price / Earnings per share",
+      formula: withSource("P/E = Current share price / Earnings per share", fundamentals),
       label: "P/E Discipline",
       maxPoints: 25,
       points: scoreByThresholds(fundamentals.peRatio, [
@@ -95,7 +137,7 @@ function buildGrahamScore(fundamentals: EstimatedFundamentals): ValueScore {
     }),
     buildMetric({
       description: "Current ratio estimates short-term balance-sheet safety. A higher value means current assets are larger than current liabilities.",
-      formula: "Current ratio = Current assets / Current liabilities",
+      formula: withSource("Current ratio = Current assets / Current liabilities", fundamentals),
       label: "Current Ratio",
       maxPoints: 20,
       points: fundamentals.currentRatio >= 2 ? 20 : fundamentals.currentRatio >= 1.5 ? 14 : fundamentals.currentRatio >= 1 ? 8 : 2,
@@ -103,7 +145,7 @@ function buildGrahamScore(fundamentals: EstimatedFundamentals): ValueScore {
     }),
     buildMetric({
       description: "Debt-to-equity checks whether the company is leaning too hard on borrowed money. Graham preferred conservatively financed businesses.",
-      formula: "Debt-to-equity = Total debt / Shareholder equity",
+      formula: withSource("Debt-to-equity = Total debt / Shareholder equity", fundamentals),
       label: "Debt Control",
       maxPoints: 20,
       points: fundamentals.debtToEquity <= 0.5 ? 20 : fundamentals.debtToEquity <= 1 ? 14 : fundamentals.debtToEquity <= 1.5 ? 8 : 2,
@@ -111,7 +153,7 @@ function buildGrahamScore(fundamentals: EstimatedFundamentals): ValueScore {
     }),
     buildMetric({
       description: "Graham Number is a classic estimate of a fair value ceiling using earnings and book value. A discount means price is below that estimate.",
-      formula: "Graham Number = square root of (22.5 x EPS x Book value per share)",
+      formula: withSource("Graham Number = square root of (22.5 x EPS x Book value per share)", fundamentals),
       label: "Margin of Safety",
       maxPoints: 25,
       points: grahamDiscount >= 0.25 ? 25 : grahamDiscount >= 0.05 ? 18 : grahamDiscount >= -0.15 ? 10 : 3,
@@ -119,7 +161,7 @@ function buildGrahamScore(fundamentals: EstimatedFundamentals): ValueScore {
     }),
     buildMetric({
       description: "Stable earnings reduce the chance that today's cheap price is hiding a deteriorating business.",
-      formula: "Local estimate based on price-history volatility until SEC multi-year earnings data is connected",
+      formula: withSource("Earnings stability = local price-history volatility proxy until multi-year earnings data is stored", fundamentals),
       label: "Earnings Stability",
       maxPoints: 10,
       points: Math.round(fundamentals.earningsStability * 10),
@@ -131,11 +173,11 @@ function buildGrahamScore(fundamentals: EstimatedFundamentals): ValueScore {
 }
 
 // buildBuffettScore grades business quality, owner earnings, and moat-like durability.
-function buildBuffettScore(fundamentals: EstimatedFundamentals): ValueScore {
+function buildBuffettScore(fundamentals: ScoringFundamentals): ValueScore {
   const metrics: ValueMetric[] = [
     buildMetric({
       description: "Return on equity estimates how efficiently management turns shareholder capital into profit. Buffett tends to prefer high returns without excessive debt.",
-      formula: "ROE = Net income / Shareholder equity",
+      formula: withSource("ROE = Net income / Shareholder equity", fundamentals),
       label: "Return on Equity",
       maxPoints: 25,
       points: fundamentals.returnOnEquity >= 0.2 ? 25 : fundamentals.returnOnEquity >= 0.15 ? 19 : fundamentals.returnOnEquity >= 0.1 ? 12 : 5,
@@ -143,7 +185,7 @@ function buildBuffettScore(fundamentals: EstimatedFundamentals): ValueScore {
     }),
     buildMetric({
       description: "Free-cash-flow yield compares owner-like cash generation with the share price. Higher yield can mean a better deal if the business is durable.",
-      formula: "FCF yield = Free cash flow per share / Current share price",
+      formula: withSource("FCF yield = Free cash flow per share / Current share price", fundamentals),
       label: "Owner Cash Yield",
       maxPoints: 20,
       points: fundamentals.freeCashFlowYield >= 0.08 ? 20 : fundamentals.freeCashFlowYield >= 0.05 ? 15 : fundamentals.freeCashFlowYield >= 0.025 ? 9 : 3,
@@ -151,7 +193,7 @@ function buildBuffettScore(fundamentals: EstimatedFundamentals): ValueScore {
     }),
     buildMetric({
       description: "Margins are a rough moat proxy. Strong margins can suggest pricing power, brand strength, scale, or a better business model.",
-      formula: "Operating margin = Operating income / Revenue",
+      formula: withSource("Operating margin = Operating income / Revenue", fundamentals),
       label: "Margin Quality",
       maxPoints: 20,
       points: fundamentals.operatingMargin >= 0.22 ? 20 : fundamentals.operatingMargin >= 0.15 ? 15 : fundamentals.operatingMargin >= 0.08 ? 9 : 3,
@@ -159,7 +201,7 @@ function buildBuffettScore(fundamentals: EstimatedFundamentals): ValueScore {
     }),
     buildMetric({
       description: "Revenue growth is not enough by itself, but steady growth gives a high-quality business more room to compound.",
-      formula: "Revenue growth = Recent revenue change / Prior revenue",
+      formula: withSource("Revenue growth = Recent revenue change / Prior revenue", fundamentals),
       label: "Growth Durability",
       maxPoints: 15,
       points: fundamentals.revenueGrowth >= 0.08 ? 15 : fundamentals.revenueGrowth >= 0.03 ? 11 : fundamentals.revenueGrowth >= 0 ? 7 : 2,
@@ -167,7 +209,7 @@ function buildBuffettScore(fundamentals: EstimatedFundamentals): ValueScore {
     }),
     buildMetric({
       description: "Buffett-style quality depends on strength without fragile leverage. This rewards companies that pair good returns with manageable debt.",
-      formula: "Quality leverage check = ROE score adjusted by debt-to-equity",
+      formula: withSource("Quality leverage check = ROE score adjusted by debt-to-equity", fundamentals),
       label: "Low-Debt Quality",
       maxPoints: 20,
       points: fundamentals.debtToEquity <= 0.6 && fundamentals.returnOnEquity >= 0.15 ? 20 : fundamentals.debtToEquity <= 1 ? 14 : fundamentals.debtToEquity <= 1.5 ? 8 : 3,
@@ -176,6 +218,11 @@ function buildBuffettScore(fundamentals: EstimatedFundamentals): ValueScore {
   ];
 
   return buildValueScore("Buffett Quality", metrics, "Checks whether the stock resembles a durable, cash-generating business that might deserve long-term ownership.");
+}
+
+// withSource appends the data origin to each tooltip formula in plain English.
+function withSource(formula: string, fundamentals: ScoringFundamentals) {
+  return `${formula}. Data source: ${fundamentals.sourceLabel}.`;
 }
 
 // buildMetric returns one explainable metric row.
@@ -205,6 +252,15 @@ function scoreByThresholds(value: number, thresholds: Array<[number, number]>) {
   }
 
   return 1;
+}
+
+// safeDivide returns undefined for missing or zero denominator values so fallbacks can take over.
+function safeDivide(numerator: number | undefined, denominator: number | undefined) {
+  if (numerator === undefined || denominator === undefined || denominator === 0) {
+    return undefined;
+  }
+
+  return numerator / denominator;
 }
 
 // calculateAverageMove estimates volatility from close-to-close moves.

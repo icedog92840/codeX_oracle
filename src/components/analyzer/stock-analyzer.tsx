@@ -5,6 +5,7 @@ import { AlertCircle, Bookmark, BookmarkCheck, ExternalLink, Info, Loader2, News
 import { getAnalyzerDataProvider } from "@/lib/analyzer/analyzer-data-resolver";
 import { buildAnalyzerScan } from "@/lib/analyzer/technical-score";
 import type { AnalyzerScan, OhlcCandle, ValueMetric, ValueScore, WatchlistItem } from "@/lib/analyzer/types";
+import type { FundamentalSnapshot, StockResearchSnapshot } from "@/lib/external-data/types";
 import { cn } from "@/lib/utils";
 
 // LoadingMessages are displayed one at a time while the analyzer simulates the local scan pipeline.
@@ -116,11 +117,15 @@ export function StockAnalyzer() {
     setIsLoading(true);
 
     try {
-      const payload = await getAnalyzerDataProvider().getAnalyzerPayload(ticker);
+      const [payload, researchSnapshot] = await Promise.all([
+        getAnalyzerDataProvider().getAnalyzerPayload(ticker),
+        fetchResearchSnapshot(ticker),
+      ]);
       const result = buildAnalyzerScan({
         ticker: payload.profile.ticker,
         companyName: payload.profile.companyName,
         dividendYield: payload.profile.dividendYield,
+        fundamentals: researchSnapshot?.fundamentals,
         source: payload.source,
         candles: payload.candles,
       });
@@ -129,7 +134,7 @@ export function StockAnalyzer() {
       setScan(result);
       setRecentScans((currentScans) => storeRecentScans([result, ...currentScans]));
       setWatchlist((currentWatchlist) => refreshWatchlistScan(currentWatchlist, result));
-      void persistAnalyzerScan(result);
+      void persistAnalyzerScan(result, researchSnapshot?.fundamentals, researchSnapshot?.news);
     } catch {
       setError("The analyzer data provider could not return an OHLC payload for that ticker.");
     } finally {
@@ -896,15 +901,30 @@ async function hydrateDatabaseWatchlist(setWatchlist: (updater: (currentWatchlis
 }
 
 // persistAnalyzerScan mirrors one completed scan into SQLite without blocking the UI.
-async function persistAnalyzerScan(scan: AnalyzerScan) {
+async function persistAnalyzerScan(scan: AnalyzerScan, fundamentals?: FundamentalSnapshot, news?: StockResearchSnapshot["news"]) {
   try {
     await fetch("/api/analyzer/scans", {
-      body: JSON.stringify({ scan }),
+      body: JSON.stringify({ fundamentals, news, scan }),
       headers: { "Content-Type": "application/json" },
       method: "POST",
     });
   } catch {
     return;
+  }
+}
+
+// fetchResearchSnapshot asks the local research route for cached fundamentals and news, then fails softly.
+async function fetchResearchSnapshot(ticker: string): Promise<StockResearchSnapshot | null> {
+  try {
+    const response = await fetch(`/api/research/${encodeURIComponent(ticker)}`);
+
+    if (!response.ok) {
+      return null;
+    }
+
+    return await response.json() as StockResearchSnapshot;
+  } catch {
+    return null;
   }
 }
 

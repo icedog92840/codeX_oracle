@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { AnalyzerScan } from "@/lib/analyzer/types";
 import { getRecentAnalyzerScans, saveAnalyzerScanSnapshot } from "@/lib/db/repositories/research-store";
+import type { FundamentalSnapshot, StockNewsItem } from "@/lib/external-data/types";
 
 // GET returns recent saved analyzer scans for a ticker from SQLite.
 export function GET(request: Request) {
@@ -20,14 +21,14 @@ export function GET(request: Request) {
 
 // POST stores one completed analyzer scan snapshot in SQLite.
 export async function POST(request: Request) {
-  const body = await request.json().catch(() => null) as { scan?: AnalyzerScan } | null;
+  const body = await request.json().catch(() => null) as { fundamentals?: FundamentalSnapshot; news?: StockNewsItem[]; scan?: AnalyzerScan } | null;
   const scan = body?.scan;
 
   if (!isAnalyzerScanPayload(scan)) {
     return NextResponse.json({ error: "Valid analyzer scan payload is required." }, { status: 400 });
   }
 
-  saveAnalyzerScanSnapshot({ scan });
+  saveAnalyzerScanSnapshot({ fundamentals: body?.fundamentals, news: body?.news, scan });
 
   return NextResponse.json({
     id: scan.id,

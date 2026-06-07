@@ -79,8 +79,15 @@ async function getCikForTicker(ticker: string) {
 function buildFundamentalSnapshot(ticker: string, data: SecCompanyFactsResponse): FundamentalSnapshot {
   const gaap = data.facts?.["us-gaap"] ?? {};
   const dei = data.facts?.dei ?? {};
-  const revenue = latestUsd(gaap.Revenues) ?? latestUsd(gaap.RevenueFromContractWithCustomerExcludingAssessedTax);
+  const revenueFact = gaap.Revenues ?? gaap.RevenueFromContractWithCustomerExcludingAssessedTax;
+  const revenue = latestUsd(revenueFact);
+  const [latestRevenue, priorRevenue] = latestUsdValues(revenueFact, 2);
+  const revenueGrowth = latestRevenue !== undefined && priorRevenue ? (latestRevenue - priorRevenue) / Math.abs(priorRevenue) : undefined;
+  const currentAssets = latestUsd(gaap.AssetsCurrent);
+  const currentLiabilities = latestUsd(gaap.LiabilitiesCurrent);
+  const grossProfit = latestUsd(gaap.GrossProfit);
   const netIncome = latestUsd(gaap.NetIncomeLoss);
+  const operatingIncome = latestUsd(gaap.OperatingIncomeLoss);
   const totalAssets = latestUsd(gaap.Assets);
   const totalLiabilities = latestUsd(gaap.Liabilities);
   const shareholderEquity = latestUsd(gaap.StockholdersEquity);
@@ -96,13 +103,18 @@ function buildFundamentalSnapshot(ticker: string, data: SecCompanyFactsResponse)
   return {
     bookValuePerShare,
     capitalExpenditures,
+    currentAssets,
+    currentLiabilities,
     debtToEquity,
     freeCashFlow,
+    grossProfit,
     longTermDebt,
     netIncome,
+    operatingIncome,
     operatingCashFlow,
     returnOnEquity,
     revenue,
+    revenueGrowth,
     shareholderEquity,
     sharesOutstanding,
     source: "sec-edgar",
@@ -117,6 +129,11 @@ function latestUsd(fact: SecFact | undefined) {
   return latestValue(fact?.units?.USD);
 }
 
+// latestUsdValues returns the newest USD values for comparisons like revenue growth.
+function latestUsdValues(fact: SecFact | undefined, count: number) {
+  return latestValues(fact?.units?.USD, count);
+}
+
 // latestShares returns the newest shares fact value.
 function latestShares(fact: SecFact | undefined) {
   return latestValue(fact?.units?.shares);
@@ -124,11 +141,19 @@ function latestShares(fact: SecFact | undefined) {
 
 // latestValue sorts fact rows by period end and filing date, then returns the newest value.
 function latestValue(rows: SecFactRow[] | undefined) {
-  const latest = rows
-    ?.filter((row) => typeof row.val === "number" && row.form !== "8-K")
-    .sort((left, right) => `${right.end ?? ""}${right.filed ?? ""}`.localeCompare(`${left.end ?? ""}${left.filed ?? ""}`))[0];
+  const latest = latestValues(rows, 1)[0];
 
-  return latest?.val;
+  return latest;
+}
+
+// latestValues sorts fact rows by period end and filing date, then returns newest numeric values.
+function latestValues(rows: SecFactRow[] | undefined, count: number) {
+  return rows
+    ?.filter((row) => typeof row.val === "number" && row.form !== "8-K")
+    .sort((left, right) => `${right.end ?? ""}${right.filed ?? ""}`.localeCompare(`${left.end ?? ""}${left.filed ?? ""}`))
+    .filter((row, index, sortedRows) => sortedRows.findIndex((candidate) => candidate.end === row.end) === index)
+    .slice(0, count)
+    .map((row) => row.val as number) ?? [];
 }
 
 // getSecHeaders provides the required SEC User-Agent contact string.

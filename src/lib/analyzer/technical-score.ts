@@ -2,18 +2,21 @@ import type { AnalyzerDataSource, AnalyzerScan, MacdResult, OhlcCandle, ScoreBre
 import { calculateMacd, calculateResistance, calculateRsi, calculateSma, calculateSupport } from "@/lib/analyzer/technical-indicators";
 import { buildTechnicalSummary } from "@/lib/analyzer/technical-summary";
 import { buildValueScorecard } from "@/lib/analyzer/value-score";
+import type { FundamentalSnapshot } from "@/lib/external-data/types";
 
 // buildAnalyzerScan turns OHLC data and profile fields into one complete technical snapshot.
 export function buildAnalyzerScan({
   ticker,
   companyName,
   dividendYield,
+  fundamentals,
   source,
   candles,
 }: {
   ticker: string;
   companyName: string;
   dividendYield: number;
+  fundamentals?: FundamentalSnapshot;
   source: AnalyzerDataSource;
   candles: OhlcCandle[];
 }): AnalyzerScan {
@@ -29,7 +32,7 @@ export function buildAnalyzerScan({
   const grade = scoreToGrade(score);
   const signals = buildSignals({ price, sma50, sma200, support20, resistance20, rsi14, macd });
   const summary = buildTechnicalSummary({ ticker, price, sma50, sma200, support20, resistance20, rsi14, macd });
-  const valueScorecard = buildValueScorecard({ candles, dividendYield, price, technicalScore: score, ticker });
+  const valueScorecard = buildValueScorecard({ candles, dividendYield, fundamentals, price, technicalScore: score, ticker });
 
   return {
     id: `${ticker}-${Date.now()}`,

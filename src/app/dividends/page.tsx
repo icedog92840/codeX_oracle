@@ -79,8 +79,8 @@ export default async function DividendsPage({
             <TrendModeSwitch dividendData={dividendData} />
           </div>
           <div className="mt-4 flex h-56 items-stretch gap-2 border-b border-l px-2 pb-2">
-            {trendPoints.map((point) => (
-              <TrendBar key={point.label} point={point} maxTotal={maxTrendTotal} />
+            {trendPoints.map((point, index) => (
+              <TrendBar key={point.label} point={point} maxTotal={maxTrendTotal} index={index} count={trendPoints.length} />
             ))}
           </div>
         </section>
@@ -319,12 +319,18 @@ function TrendModeSwitch({ dividendData }: { dividendData: DividendTrackingData 
 }
 
 // TrendBar renders one payout bar with a custom hover tooltip.
-function TrendBar({ point, maxTotal }: { point: DividendTrendPoint; maxTotal: number }) {
+function TrendBar({ point, maxTotal, index, count }: { point: DividendTrendPoint; maxTotal: number; index: number; count: number }) {
   const height = Math.max((point.total / maxTotal) * 100, point.total > 0 ? 8 : 0);
+  const tooltipPosition = index === 0 ? "left-0" : index === count - 1 ? "right-0" : "left-1/2 -translate-x-1/2";
 
   return (
     <div className="group/bar relative flex h-full min-w-0 flex-1 flex-col justify-end gap-2">
-      <div className="pointer-events-none absolute bottom-[calc(100%+8px)] left-1/2 z-30 w-32 -translate-x-1/2 rounded-xl border bg-[#191929] p-2 text-center opacity-0 shadow-[0_18px_45px_rgba(0,0,0,0.34)] ring-1 ring-primary/10 transition-opacity group-hover/bar:opacity-100">
+      <div
+        className={cn(
+          "pointer-events-none absolute bottom-[calc(100%+8px)] z-30 w-32 rounded-xl border bg-[#191929] p-2 text-center opacity-0 shadow-[0_18px_45px_rgba(0,0,0,0.34)] ring-1 ring-primary/10 transition-opacity group-hover/bar:opacity-100",
+          tooltipPosition,
+        )}
+      >
         <p className="font-mono text-xs font-semibold text-foreground">{point.displayTotal}</p>
         <p className="mt-1 text-[10px] text-muted-foreground">{point.label}</p>
       </div>

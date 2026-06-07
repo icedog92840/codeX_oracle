@@ -1,4 +1,4 @@
-import type { OhlcCandle, ValueMetric, ValueScore, ValueScorecard } from "@/lib/analyzer/types";
+import type { OhlcCandle, ValueDataConfidence, ValueMetric, ValueScore, ValueScorecard } from "@/lib/analyzer/types";
 import type { FundamentalSnapshot } from "@/lib/external-data/types";
 
 // ValueScoreInput stores the fields used to build Graham/Buffett style scores.
@@ -20,6 +20,7 @@ export function buildValueScorecard({ candles, dividendYield, fundamentals: live
 
   return {
     buffett,
+    dataConfidence: fundamentals.dataConfidence,
     graham,
     ownerGrade: scoreToGrade(ownerScore),
     ownerScore,
@@ -41,6 +42,7 @@ type ScoringFundamentals = {
   price: number;
   returnOnEquity: number;
   revenueGrowth: number;
+  dataConfidence: ValueDataConfidence;
   sourceLabel: string;
 };
 
@@ -75,6 +77,14 @@ function buildEstimatedFundamentals({ candles, dividendYield, price, ticker }: O
     price,
     returnOnEquity,
     revenueGrowth,
+    dataConfidence: {
+      description: "No usable provider fundamentals were available for this scan, so owner-score fundamentals are deterministic local estimates. Technical indicators still use the analyzer OHLC payload.",
+      estimatedFields: 10,
+      label: "Estimated",
+      level: "estimated",
+      providerFields: 0,
+      totalFields: 10,
+    },
     sourceLabel: "local deterministic estimates from mock OHLC until filing data exists",
   };
 }
@@ -87,33 +97,53 @@ function buildScoringFundamentals({ candles, dividendYield, fundamentals, price,
     return fallback;
   }
 
-  const eps = safeDivide(fundamentals.netIncome, fundamentals.sharesOutstanding) ?? fallback.eps;
-  const peRatio = eps > 0 ? price / eps : fallback.peRatio;
-  const bookValuePerShare =
-    fundamentals.bookValuePerShare ??
-    safeDivide(fundamentals.shareholderEquity, fundamentals.sharesOutstanding) ??
-    fallback.bookValuePerShare;
-  const currentRatio = safeDivide(fundamentals.currentAssets, fundamentals.currentLiabilities) ?? fallback.currentRatio;
-  const debtToEquity = fundamentals.debtToEquity ?? safeDivide(fundamentals.longTermDebt, fundamentals.shareholderEquity) ?? fallback.debtToEquity;
-  const returnOnEquity = fundamentals.returnOnEquity ?? safeDivide(fundamentals.netIncome, fundamentals.shareholderEquity) ?? fallback.returnOnEquity;
+  const epsResult = chooseFundamental(safeDivide(fundamentals.netIncome, fundamentals.sharesOutstanding), fallback.eps);
+  const peRatioResult = chooseFundamental(epsResult.fromProvider && epsResult.value > 0 ? price / epsResult.value : undefined, fallback.peRatio);
+  const bookValueResult = chooseFundamental(
+    fundamentals.bookValuePerShare ?? safeDivide(fundamentals.shareholderEquity, fundamentals.sharesOutstanding),
+    fallback.bookValuePerShare,
+  );
+  const currentRatioResult = chooseFundamental(safeDivide(fundamentals.currentAssets, fundamentals.currentLiabilities), fallback.currentRatio);
+  const debtToEquityResult = chooseFundamental(
+    fundamentals.debtToEquity ?? safeDivide(fundamentals.longTermDebt, fundamentals.shareholderEquity),
+    fallback.debtToEquity,
+  );
+  const returnOnEquityResult = chooseFundamental(
+    fundamentals.returnOnEquity ?? safeDivide(fundamentals.netIncome, fundamentals.shareholderEquity),
+    fallback.returnOnEquity,
+  );
   const freeCashFlowPerShare = safeDivide(fundamentals.freeCashFlow, fundamentals.sharesOutstanding);
-  const freeCashFlowYield = freeCashFlowPerShare !== undefined ? freeCashFlowPerShare / Math.max(price, 1) : fallback.freeCashFlowYield;
-  const grossMargin = safeDivide(fundamentals.grossProfit, fundamentals.revenue) ?? fallback.grossMargin;
-  const operatingMargin = safeDivide(fundamentals.operatingIncome, fundamentals.revenue) ?? fallback.operatingMargin;
+  const freeCashFlowYieldResult = chooseFundamental(freeCashFlowPerShare !== undefined ? freeCashFlowPerShare / Math.max(price, 1) : undefined, fallback.freeCashFlowYield);
+  const grossMarginResult = chooseFundamental(safeDivide(fundamentals.grossProfit, fundamentals.revenue), fallback.grossMargin);
+  const operatingMarginResult = chooseFundamental(safeDivide(fundamentals.operatingIncome, fundamentals.revenue), fallback.operatingMargin);
+  const revenueGrowthResult = chooseFundamental(fundamentals.revenueGrowth, fallback.revenueGrowth);
+  const dataConfidence = buildDataConfidence(fundamentals.source, [
+    epsResult,
+    peRatioResult,
+    bookValueResult,
+    currentRatioResult,
+    debtToEquityResult,
+    returnOnEquityResult,
+    freeCashFlowYieldResult,
+    grossMarginResult,
+    operatingMarginResult,
+    revenueGrowthResult,
+  ]);
 
   return {
     ...fallback,
-    bookValuePerShare,
-    currentRatio,
-    debtToEquity,
-    eps,
-    freeCashFlowYield,
-    grossMargin,
-    operatingMargin,
-    peRatio,
-    returnOnEquity,
-    revenueGrowth: fundamentals.revenueGrowth ?? fallback.revenueGrowth,
-    sourceLabel: `${fundamentals.source} fundamentals where available, local estimates for any missing fields`,
+    bookValuePerShare: bookValueResult.value,
+    currentRatio: currentRatioResult.value,
+    dataConfidence,
+    debtToEquity: debtToEquityResult.value,
+    eps: epsResult.value,
+    freeCashFlowYield: freeCashFlowYieldResult.value,
+    grossMargin: grossMarginResult.value,
+    operatingMargin: operatingMarginResult.value,
+    peRatio: peRatioResult.value,
+    returnOnEquity: returnOnEquityResult.value,
+    revenueGrowth: revenueGrowthResult.value,
+    sourceLabel: dataConfidence.description,
   };
 }
 
@@ -218,6 +248,45 @@ function buildBuffettScore(fundamentals: ScoringFundamentals): ValueScore {
   ];
 
   return buildValueScore("Buffett Quality", metrics, "Checks whether the stock resembles a durable, cash-generating business that might deserve long-term ownership.");
+}
+
+// chooseFundamental records whether one normalized scoring input came from provider data or fallback estimates.
+function chooseFundamental(providerValue: number | undefined, fallbackValue: number) {
+  if (providerValue !== undefined && Number.isFinite(providerValue)) {
+    return {
+      fromProvider: true,
+      value: providerValue,
+    };
+  }
+
+  return {
+    fromProvider: false,
+    value: fallbackValue,
+  };
+}
+
+// buildDataConfidence summarizes provider coverage for the owner-score inputs.
+function buildDataConfidence(provider: FundamentalSnapshot["source"], selectedInputs: Array<{ fromProvider: boolean }>): ValueDataConfidence {
+  const totalFields = selectedInputs.length;
+  const providerFields = selectedInputs.filter((input) => input.fromProvider).length;
+  const estimatedFields = totalFields - providerFields;
+  const level: ValueDataConfidence["level"] = providerFields === totalFields ? "provider" : providerFields > 0 ? "mixed" : "estimated";
+  const label = level === "provider" ? "Provider-backed" : level === "mixed" ? "Mixed data" : "Estimated";
+
+  return {
+    description:
+      level === "provider"
+        ? `All owner-score fundamentals used by this scan came from ${provider}.`
+        : level === "mixed"
+          ? `${providerFields} of ${totalFields} owner-score fundamentals came from ${provider}; ${estimatedFields} missing inputs used deterministic local estimates.`
+          : `No usable owner-score fundamentals came from ${provider}; this scan used deterministic local estimates.`,
+    estimatedFields,
+    label,
+    level,
+    provider,
+    providerFields,
+    totalFields,
+  };
 }
 
 // withSource appends the data origin to each tooltip formula in plain English.

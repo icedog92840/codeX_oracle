@@ -392,12 +392,16 @@ function MetricGrid({ scan }: { scan: AnalyzerScan }) {
 // ValueScorecardPanel renders Graham/Buffett owner-oriented grades alongside technical timing.
 function ValueScorecardPanel({ scan }: { scan: AnalyzerScan }) {
   const scorecard = scan.valueScorecard;
+  const dataConfidence = getValueDataConfidence(scorecard);
 
   return (
     <section className="rounded-xl border bg-card/90 p-3 shadow-[0_18px_45px_rgba(0,0,0,0.20)]">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
-          <h3 className="text-base font-semibold">Owner Grade</h3>
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-base font-semibold">Owner Grade</h3>
+            <DataConfidenceBadge confidence={dataConfidence} />
+          </div>
           <p className="mt-1 text-xs text-muted-foreground">Graham defensive value plus Buffett business quality, with technical timing kept as a small final weight.</p>
         </div>
         <div className="rounded-xl border bg-[#191929] px-4 py-3 text-right">
@@ -414,8 +418,41 @@ function ValueScorecardPanel({ scan }: { scan: AnalyzerScan }) {
 
       <div className="mt-3 rounded-xl border bg-[#191929] p-3 text-xs leading-5 text-muted-foreground">
         Owner Grade formula: Graham score is weighted 42%, Buffett score is weighted 48%, and technical timing contributes 10%. Technical timing currently adds {scorecard.technicalTimingWeight} points.
+        Data confidence: {dataConfidence.providerFields}/{dataConfidence.totalFields} owner-score fundamentals came from provider data.
       </div>
     </section>
+  );
+}
+
+// DataConfidenceBadge renders the owner-score source quality with a hover/focus explanation.
+function DataConfidenceBadge({ confidence }: { confidence: AnalyzerScan["valueScorecard"]["dataConfidence"] }) {
+  const toneClass = confidence.level === "provider"
+    ? "border-emerald-300/50 bg-emerald-400/10 text-emerald-200"
+    : confidence.level === "mixed"
+      ? "border-primary/50 bg-primary/10 text-primary"
+      : "border-amber-300/50 bg-amber-400/10 text-amber-200";
+
+  return (
+    <span className="group/confidence relative inline-flex">
+      <button
+        className={cn("inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-normal outline-none transition-colors", toneClass)}
+        type="button"
+        aria-label="Owner grade data confidence"
+      >
+        <span className="size-1.5 rounded-full bg-current shadow-[0_0_10px_currentColor]" aria-hidden="true" />
+        {confidence.label}
+        <Info className="size-3" aria-hidden="true" />
+      </button>
+      <span className="pointer-events-none absolute left-0 top-[calc(100%+8px)] z-40 w-80 rounded-xl border bg-[#24243a] p-3 text-xs opacity-0 shadow-[0_18px_45px_rgba(0,0,0,0.38)] ring-1 ring-primary/10 transition-opacity group-hover/confidence:opacity-100 group-focus-within/confidence:opacity-100">
+        <span className="block font-semibold text-foreground">{confidence.label}</span>
+        <span className="mt-2 block leading-5 text-muted-foreground">{confidence.description}</span>
+        <span className="mt-2 block rounded-lg border bg-[#191929] p-2 font-mono text-[11px] leading-5 text-primary">
+          Provider inputs: {confidence.providerFields}/{confidence.totalFields}
+          <br />
+          Estimated inputs: {confidence.estimatedFields}/{confidence.totalFields}
+        </span>
+      </span>
+    </span>
   );
 }
 
@@ -853,6 +890,18 @@ function buildChartGeometry(candles: OhlcCandle[], support: number, resistance: 
         label: formatCompactCurrency(value),
       };
     }),
+  };
+}
+
+// getValueDataConfidence keeps older saved scans readable if they predate confidence metadata.
+function getValueDataConfidence(scorecard: AnalyzerScan["valueScorecard"]): AnalyzerScan["valueScorecard"]["dataConfidence"] {
+  return scorecard.dataConfidence ?? {
+    description: "This saved score predates data-confidence tracking. Re-run the scan to see provider versus estimate coverage.",
+    estimatedFields: 10,
+    label: "Legacy scan",
+    level: "estimated",
+    providerFields: 0,
+    totalFields: 10,
   };
 }
 

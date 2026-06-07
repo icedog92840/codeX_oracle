@@ -64,9 +64,21 @@ export type ValueScore = {
   summary: string;
 };
 
+// ValueDataConfidence explains how much of the owner score came from real fundamentals.
+export type ValueDataConfidence = {
+  description: string;
+  estimatedFields: number;
+  label: string;
+  level: "estimated" | "mixed" | "provider";
+  provider?: string;
+  providerFields: number;
+  totalFields: number;
+};
+
 // ValueScorecard stores Graham, Buffett, and combined owner-oriented scores.
 export type ValueScorecard = {
   buffett: ValueScore;
+  dataConfidence: ValueDataConfidence;
   graham: ValueScore;
   ownerGrade: "A" | "B" | "C" | "D" | "F";
   ownerScore: number;

@@ -27,8 +27,10 @@ type SecFact = {
 type SecFactRow = {
   end?: string;
   filed?: string;
+  fp?: string;
   form?: string;
   fy?: number;
+  start?: string;
   val?: number;
 };
 
@@ -84,21 +86,21 @@ async function getCikForTicker(ticker: string) {
 function buildFundamentalSnapshot(ticker: string, data: SecCompanyFactsResponse): FundamentalSnapshot {
   const gaap = data.facts?.["us-gaap"] ?? {};
   const dei = data.facts?.dei ?? {};
-  const revenueFact = gaap.Revenues ?? gaap.RevenueFromContractWithCustomerExcludingAssessedTax;
-  const revenue = latestUsd(revenueFact);
-  const [latestRevenue, priorRevenue] = latestUsdValues(revenueFact, 2);
+  const revenueFact = selectNewestAnnualFact(gaap.RevenueFromContractWithCustomerExcludingAssessedTax, gaap.Revenues);
+  const revenue = latestAnnualUsd(revenueFact);
+  const [latestRevenue, priorRevenue] = latestAnnualUsdValues(revenueFact, 2);
   const revenueGrowth = latestRevenue !== undefined && priorRevenue ? (latestRevenue - priorRevenue) / Math.abs(priorRevenue) : undefined;
   const currentAssets = latestUsd(gaap.AssetsCurrent);
   const currentLiabilities = latestUsd(gaap.LiabilitiesCurrent);
-  const grossProfit = latestUsd(gaap.GrossProfit);
-  const netIncome = latestUsd(gaap.NetIncomeLoss);
-  const operatingIncome = latestUsd(gaap.OperatingIncomeLoss);
+  const grossProfit = latestAnnualUsd(gaap.GrossProfit);
+  const netIncome = latestAnnualUsd(gaap.NetIncomeLoss);
+  const operatingIncome = latestAnnualUsd(gaap.OperatingIncomeLoss);
   const totalAssets = latestUsd(gaap.Assets);
   const totalLiabilities = latestUsd(gaap.Liabilities);
   const shareholderEquity = latestUsd(gaap.StockholdersEquity);
   const longTermDebt = latestUsd(gaap.LongTermDebtNoncurrent) ?? latestUsd(gaap.LongTermDebt);
-  const operatingCashFlow = latestUsd(gaap.NetCashProvidedByUsedInOperatingActivities);
-  const capitalExpenditures = latestUsd(gaap.PaymentsToAcquirePropertyPlantAndEquipment);
+  const operatingCashFlow = latestAnnualUsd(gaap.NetCashProvidedByUsedInOperatingActivities);
+  const capitalExpenditures = latestAnnualUsd(gaap.PaymentsToAcquirePropertyPlantAndEquipment);
   const sharesOutstanding = latestShares(dei.EntityCommonStockSharesOutstanding);
   const freeCashFlow = operatingCashFlow !== undefined && capitalExpenditures !== undefined ? operatingCashFlow - Math.abs(capitalExpenditures) : undefined;
   const bookValuePerShare = shareholderEquity !== undefined && sharesOutstanding ? shareholderEquity / sharesOutstanding : undefined;
@@ -134,9 +136,14 @@ function latestUsd(fact: SecFact | undefined) {
   return latestValue(fact?.units?.USD);
 }
 
-// latestUsdValues returns the newest USD values for comparisons like revenue growth.
-function latestUsdValues(fact: SecFact | undefined, count: number) {
-  return latestValues(fact?.units?.USD, count);
+// latestAnnualUsd returns the newest annual USD fact for income and cash-flow metrics.
+function latestAnnualUsd(fact: SecFact | undefined) {
+  return latestAnnualValues(fact?.units?.USD, 1)[0];
+}
+
+// latestAnnualUsdValues returns same-duration annual USD values for growth comparisons.
+function latestAnnualUsdValues(fact: SecFact | undefined, count: number) {
+  return latestAnnualValues(fact?.units?.USD, count);
 }
 
 // latestShares returns the newest shares fact value.
@@ -159,6 +166,52 @@ function latestValues(rows: SecFactRow[] | undefined, count: number) {
     .filter((row, index, sortedRows) => sortedRows.findIndex((candidate) => candidate.end === row.end) === index)
     .slice(0, count)
     .map((row) => row.val as number) ?? [];
+}
+
+// latestAnnualValues filters out quarterly duration facts so annual ratios compare like periods.
+function latestAnnualValues(rows: SecFactRow[] | undefined, count: number) {
+  return rows
+    ?.filter((row) => typeof row.val === "number" && row.form !== "8-K" && isAnnualDuration(row))
+    .sort((left, right) => `${right.end ?? ""}${right.filed ?? ""}`.localeCompare(`${left.end ?? ""}${left.filed ?? ""}`))
+    .filter((row, index, sortedRows) => sortedRows.findIndex((candidate) => annualFactKey(candidate) === annualFactKey(row)) === index)
+    .slice(0, count)
+    .map((row) => row.val as number) ?? [];
+}
+
+// selectNewestAnnualFact chooses the revenue tag that has the most recent annual fact rows.
+function selectNewestAnnualFact(...facts: Array<SecFact | undefined>) {
+  return facts
+    .filter((fact): fact is SecFact => Boolean(fact))
+    .sort((left, right) => getNewestAnnualEnd(right).localeCompare(getNewestAnnualEnd(left)))[0];
+}
+
+// getNewestAnnualEnd returns the newest annual period end for one SEC fact.
+function getNewestAnnualEnd(fact: SecFact) {
+  return fact.units?.USD
+    ?.filter((row) => typeof row.val === "number" && row.form !== "8-K" && isAnnualDuration(row))
+    .sort((left, right) => `${right.end ?? ""}${right.filed ?? ""}`.localeCompare(`${left.end ?? ""}${left.filed ?? ""}`))[0]?.end ?? "";
+}
+
+// isAnnualDuration checks whether a fact spans roughly one fiscal year instead of a quarter.
+function isAnnualDuration(row: SecFactRow) {
+  if (!row.start || !row.end) {
+    return row.form === "10-K" && row.fp === "FY";
+  }
+
+  const startTime = new Date(row.start).getTime();
+  const endTime = new Date(row.end).getTime();
+
+  if (!Number.isFinite(startTime) || !Number.isFinite(endTime)) {
+    return false;
+  }
+
+  const durationDays = (endTime - startTime) / 86_400_000;
+  return durationDays >= 300;
+}
+
+// annualFactKey deduplicates annual rows that share the same fiscal year or period end.
+function annualFactKey(row: SecFactRow) {
+  return row.fy !== undefined ? `${row.fy}` : row.end ?? "";
 }
 
 // getSecHeaders provides the required SEC User-Agent contact string.

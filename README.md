@@ -16,14 +16,14 @@ The app is past the original Version 1.0 baseline and is currently tagged at `v1
 - Local mock-OHLC stock analyzer with technical indicators, scoring, recent scans, and watchlist.
 - Isolated market-data provider resolver for future live stock price and dividend yield APIs.
 - Isolated analyzer-data provider resolver for future live historical OHLC APIs.
-- Server-only external-data scaffolding with local cache, free-tier budgets, and `/api/research/[ticker]`.
+- Server-only external-data scaffolding with SQLite cache, free-tier budgets, and `/api/research/[ticker]`.
 
 ## Data Sources
 
 - `Transaction_Log.csv`: Parsed dynamically on server-rendered routes for holdings, dividends, DRIP, transactions, and dashboard calculations.
 - Market prices/yields: Local placeholders only. The provider interface lives in `src/lib/market-data`.
 - Analyzer OHLC candles: Deterministic local mock data only. The provider interface lives in `src/lib/analyzer`. No external indicator API is used.
-- Future live research data: See `LIVE_DATA_SETUP.md` for Twelve Data, SEC EDGAR, FMP, Alpha Vantage, RSS, cache TTLs, and API-budget safety.
+- Future live research data: See `LIVE_DATA_SETUP.md` for Twelve Data, SEC EDGAR, FMP, Alpha Vantage, RSS, SQLite cache TTLs, and API-budget safety.
 
 ## Local Commands
 

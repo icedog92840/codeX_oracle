@@ -1,15 +1,10 @@
-import { createHash } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { eq } from "drizzle-orm";
+import { getDatabase } from "@/lib/db/connection";
+import { providerCache } from "@/lib/db/schema";
 import type { CachedResponse, ExternalDataSource } from "@/lib/external-data/types";
 
 // CacheEntry stores one local JSON-cache record on disk.
 type CacheEntry<T> = CachedResponse<T>;
-
-// getCacheRoot returns the local cache folder. It is ignored by git.
-function getCacheRoot() {
-  return process.env.CODEX_ORACLE_CACHE_DIR ?? join(process.cwd(), ".data", "external-cache");
-}
 
 // buildCacheKey creates a stable non-secret key from provider, endpoint, and request parts.
 export function buildCacheKey(provider: ExternalDataSource, endpoint: string, parts: Record<string, string | number | undefined>) {
@@ -57,8 +52,19 @@ export async function getCachedOrLoad<T>({
 // readCache loads a cached JSON record if it exists and parses cleanly.
 async function readCache<T>(cacheKey: string): Promise<CacheEntry<T> | null> {
   try {
-    const text = await readFile(getCachePath(cacheKey), "utf-8");
-    return JSON.parse(text) as CacheEntry<T>;
+    const row = getDatabase().select().from(providerCache).where(eq(providerCache.cacheKey, cacheKey)).get();
+
+    if (!row) {
+      return null;
+    }
+
+    return {
+      cacheKey: row.cacheKey,
+      data: JSON.parse(row.dataJson) as T,
+      expiresAt: row.expiresAt,
+      fetchedAt: row.fetchedAt,
+      provider: row.provider as ExternalDataSource,
+    };
   } catch {
     return null;
   }
@@ -66,12 +72,28 @@ async function readCache<T>(cacheKey: string): Promise<CacheEntry<T> | null> {
 
 // writeCache persists one cache record to the local cache folder.
 async function writeCache<T>(cacheKey: string, entry: CacheEntry<T>) {
-  await mkdir(getCacheRoot(), { recursive: true });
-  await writeFile(getCachePath(cacheKey), JSON.stringify(entry, null, 2));
-}
+  const now = new Date().toISOString();
 
-// getCachePath hashes the key so long URLs and tickers remain filesystem-safe.
-function getCachePath(cacheKey: string) {
-  const hash = createHash("sha256").update(cacheKey).digest("hex");
-  return join(getCacheRoot(), `${hash}.json`);
+  getDatabase()
+    .insert(providerCache)
+    .values({
+      cacheKey,
+      createdAt: now,
+      dataJson: JSON.stringify(entry.data),
+      expiresAt: entry.expiresAt,
+      fetchedAt: entry.fetchedAt,
+      provider: entry.provider,
+      updatedAt: now,
+    })
+    .onConflictDoUpdate({
+      set: {
+        dataJson: JSON.stringify(entry.data),
+        expiresAt: entry.expiresAt,
+        fetchedAt: entry.fetchedAt,
+        provider: entry.provider,
+        updatedAt: now,
+      },
+      target: providerCache.cacheKey,
+    })
+    .run();
 }

@@ -3,6 +3,7 @@ import { getFmpQuote, getFmpStockNews } from "@/lib/external-data/providers/fmp-
 import { getConfiguredRssNews } from "@/lib/external-data/providers/rss-news-provider";
 import { getSecFundamentals } from "@/lib/external-data/providers/sec-edgar-provider";
 import { getTwelveDataHistoricalOhlc, getTwelveDataQuote } from "@/lib/external-data/providers/twelve-data-provider";
+import { saveNewsItems } from "@/lib/db/repositories/research-store";
 import type { StockResearchSnapshot } from "@/lib/external-data/types";
 
 // getStockResearchSnapshot assembles cached quote, candles, fundamentals, and news for one ticker.
@@ -31,7 +32,7 @@ async function getCombinedNews(ticker: string) {
   const items = results.flatMap((result) => (result.status === "fulfilled" ? result.value : []));
   const seen = new Set<string>();
 
-  return items.filter((item) => {
+  const dedupedItems = items.filter((item) => {
     const key = item.url || item.title;
 
     if (seen.has(key)) {
@@ -41,6 +42,9 @@ async function getCombinedNews(ticker: string) {
     seen.add(key);
     return true;
   });
+
+  saveNewsItems(ticker, dedupedItems);
+  return dedupedItems;
 }
 
 // getFirstResolved returns the first provider result that succeeds with non-empty data.

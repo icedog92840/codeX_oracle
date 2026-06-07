@@ -53,8 +53,9 @@ This file preserves the current project state for future Codex turns if chat con
 - Market data now resolves through `src/lib/market-data/market-data-resolver.ts` and `market-data-settings.ts`.
 - The active provider remains `local-placeholder`; selecting `live` intentionally errors until a real provider is connected.
 - External live-data scaffolding now lives under `src/lib/external-data`:
-  - Local file cache in `.data/external-cache`.
-  - API-budget counters in `.data/api-budget`.
+  - SQLite database in `.data/codex-oracle.db`.
+  - Provider cache responses and API-budget counters stored in SQLite.
+  - Future-ready tables for analyzer scans, watchlist items, news, CSV imports, and app settings.
   - Provider adapters for Twelve Data, SEC EDGAR, Alpha Vantage, FMP, and configurable RSS news.
   - Server route `/api/research/[ticker]` for cached quote/candles/fundamentals/news without exposing API keys.
   - Setup notes in `LIVE_DATA_SETUP.md`.

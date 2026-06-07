@@ -20,14 +20,14 @@ SEC_EDGAR_USER_AGENT=Your Name your-email@example.com
 FMP_API_KEY=
 ALPHA_VANTAGE_API_KEY=
 STOCK_NEWS_RSS_URL_TEMPLATE=
-CODEX_ORACLE_CACHE_DIR=
+CODEX_ORACLE_DB_PATH=
 ```
 
 `STOCK_NEWS_RSS_URL_TEMPLATE` should include `{ticker}` where the symbol belongs.
 
 ## Cache And Rate Safety
 
-External provider data is cached under `.data/external-cache` by default.
+External provider data is cached in SQLite under `.data/codex-oracle.db` by default.
 
 Current TTLs:
 
@@ -37,7 +37,7 @@ Current TTLs:
 - SEC company facts: 7 days
 - SEC ticker index: 30 days
 
-Local request counters are stored under `.data/api-budget`.
+Local request counters are also stored in SQLite.
 
 Configured guardrails:
 
@@ -63,6 +63,18 @@ That route keeps API keys on the server and returns a cached research snapshot:
 - news headlines
 
 If a provider is not configured, it returns only the data available from configured providers.
+
+## SQLite Storage
+
+The local database is ignored by Git and can store:
+
+- provider cache responses
+- API usage counters
+- analyzer scan snapshots
+- database-backed watchlist rows
+- ticker news items
+- CSV import fingerprints
+- app settings
 
 ## Analyzer Direction
 

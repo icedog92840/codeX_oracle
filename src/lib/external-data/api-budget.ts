@@ -1,5 +1,6 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { eq } from "drizzle-orm";
+import { getDatabase } from "@/lib/db/connection";
+import { apiUsage } from "@/lib/db/schema";
 import type { ExternalDataSource } from "@/lib/external-data/types";
 
 // ApiBudgetPolicy defines local request ceilings for one provider.
@@ -46,8 +47,23 @@ export async function assertApiBudget(policy: ApiBudgetPolicy) {
 // readBudgetState loads provider request counters from the local data folder.
 async function readBudgetState(provider: ExternalDataSource): Promise<ApiBudgetState> {
   try {
-    const text = await readFile(getBudgetPath(provider), "utf-8");
-    return JSON.parse(text) as ApiBudgetState;
+    const row = getDatabase().select().from(apiUsage).where(eq(apiUsage.provider, provider)).get();
+
+    if (!row) {
+      return {
+        day: "",
+        dayCount: 0,
+        minute: "",
+        minuteCount: 0,
+      };
+    }
+
+    return {
+      day: row.day,
+      dayCount: row.dayCount,
+      minute: row.minute,
+      minuteCount: row.minuteCount,
+    };
   } catch {
     return {
       day: "",
@@ -60,16 +76,25 @@ async function readBudgetState(provider: ExternalDataSource): Promise<ApiBudgetS
 
 // writeBudgetState persists provider request counters locally.
 async function writeBudgetState(provider: ExternalDataSource, state: ApiBudgetState) {
-  await mkdir(getBudgetRoot(), { recursive: true });
-  await writeFile(getBudgetPath(provider), JSON.stringify(state, null, 2));
-}
-
-// getBudgetRoot returns the ignored local folder for API budget counters.
-function getBudgetRoot() {
-  return process.env.CODEX_ORACLE_CACHE_DIR ? join(process.env.CODEX_ORACLE_CACHE_DIR, "api-budget") : join(process.cwd(), ".data", "api-budget");
-}
-
-// getBudgetPath maps one provider to its local budget file.
-function getBudgetPath(provider: ExternalDataSource) {
-  return join(getBudgetRoot(), `${provider}.json`);
+  getDatabase()
+    .insert(apiUsage)
+    .values({
+      day: state.day,
+      dayCount: state.dayCount,
+      minute: state.minute,
+      minuteCount: state.minuteCount,
+      provider,
+      updatedAt: new Date().toISOString(),
+    })
+    .onConflictDoUpdate({
+      set: {
+        day: state.day,
+        dayCount: state.dayCount,
+        minute: state.minute,
+        minuteCount: state.minuteCount,
+        updatedAt: new Date().toISOString(),
+      },
+      target: apiUsage.provider,
+    })
+    .run();
 }

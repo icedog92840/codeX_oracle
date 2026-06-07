@@ -5,18 +5,25 @@ import type { ExternalDataSource } from "@/lib/external-data/types";
 // ProviderStatus explains one optional external provider without exposing secrets.
 export type ProviderStatus = {
   cacheEntries: number;
+  cacheFreshEntries: number;
+  cacheLabel: string;
+  cacheStaleEntries: number;
   capabilities: string[];
   detail: string;
   enabled: boolean;
   envKeys: string[];
   futureOptions: string[];
   label: string;
+  latestCacheFetch: string | null;
+  latestCacheExpiry: string | null;
   missingEnv: string[];
   provider: ExternalDataSource;
   quota: string;
   setupNote: string;
   tone: "accent" | "positive" | "neutral" | "warning";
   usage: string;
+  usageDetail: string;
+  usageTone: "accent" | "positive" | "warning";
 };
 
 // getProviderStatuses reports env readiness, local cache entries, and free-tier guardrails.
@@ -26,18 +33,31 @@ export function getProviderStatuses(): ProviderStatus[] {
 
   return providerOrder.map((provider) => {
     const availability = getProviderAvailability(provider);
-    const cacheEntries = cacheRows.filter((row) => row.provider === provider).length;
-    const latestCache = cacheRows
-      .filter((row) => row.provider === provider)
+    const providerCacheRows = cacheRows.filter((row) => row.provider === provider);
+    const cacheEntries = providerCacheRows.length;
+    const cacheStaleEntries = providerCacheRows.filter((row) => new Date(row.expiresAt).getTime() <= Date.now()).length;
+    const cacheFreshEntries = cacheEntries - cacheStaleEntries;
+    const latestCache = providerCacheRows
       .sort((left, right) => right.fetchedAt.localeCompare(left.fetchedAt))[0];
     const usage = usageRows.find((row) => row.provider === provider);
     const budget = budgetByProvider[provider];
     const enabled = availability.enabled;
     const meta = providerMeta[provider];
-    const cacheDetail = latestCache ? ` Latest cache fetch: ${formatDateTime(latestCache.fetchedAt)}.` : " No cached responses yet.";
+    const minuteCount = usage?.minuteCount ?? 0;
+    const dayCount = usage?.dayCount ?? 0;
+    const minuteRatio = minuteCount / budget.maxPerMinute;
+    const dayRatio = dayCount / budget.maxPerDay;
+    const usageTone = minuteRatio >= 0.8 || dayRatio >= 0.8 ? "warning" : minuteCount > 0 || dayCount > 0 ? "accent" : "positive";
+    const cacheLabel = cacheEntries === 0 ? "Empty" : cacheFreshEntries > 0 ? `${cacheFreshEntries} fresh` : `${cacheStaleEntries} stale`;
+    const cacheDetail = latestCache
+      ? ` Latest cache fetch: ${formatDateTime(latestCache.fetchedAt)}. Cache expires: ${formatDateTime(latestCache.expiresAt)}.`
+      : " No cached responses yet.";
 
     return {
       cacheEntries,
+      cacheFreshEntries,
+      cacheLabel,
+      cacheStaleEntries,
       capabilities: meta.capabilities,
       detail: enabled
         ? `${meta.label} is configured locally. Keys stay server-side and are never sent to the browser.${cacheDetail}`
@@ -46,22 +66,26 @@ export function getProviderStatuses(): ProviderStatus[] {
       envKeys: meta.envKeys,
       futureOptions: meta.futureOptions,
       label: meta.label,
+      latestCacheExpiry: latestCache?.expiresAt ?? null,
+      latestCacheFetch: latestCache?.fetchedAt ?? null,
       missingEnv: availability.missingEnv,
       provider,
       quota: `${budget.maxPerMinute}/min ${budget.maxPerDay}/day`,
       setupNote: meta.setupNote,
       tone: enabled ? "positive" : provider === "sec-edgar" ? "accent" : "warning",
-      usage: usage ? `${usage.minuteCount}/min ${usage.dayCount}/day` : "0/min 0/day",
+      usage: `${minuteCount}/min ${dayCount}/day`,
+      usageDetail: `${minuteCount} of ${budget.maxPerMinute} minute-window calls and ${dayCount} of ${budget.maxPerDay} daily calls used in the local SQLite budget counter.`,
+      usageTone,
     };
   });
 }
 
 // readProviderCacheRows returns lightweight cache metadata from local SQLite.
-function readProviderCacheRows(): Array<{ fetchedAt: string; provider: ExternalDataSource }> {
+function readProviderCacheRows(): Array<{ expiresAt: string; fetchedAt: string; provider: ExternalDataSource }> {
   try {
     return getSqlite()
-      .prepare("SELECT provider, fetched_at AS fetchedAt FROM provider_cache")
-      .all() as Array<{ fetchedAt: string; provider: ExternalDataSource }>;
+      .prepare("SELECT provider, fetched_at AS fetchedAt, expires_at AS expiresAt FROM provider_cache")
+      .all() as Array<{ expiresAt: string; fetchedAt: string; provider: ExternalDataSource }>;
   } catch {
     return [];
   }

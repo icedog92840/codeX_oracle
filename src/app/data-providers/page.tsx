@@ -1,5 +1,7 @@
-import { CheckCircle2, CircleAlert, Database, KeyRound, ShieldCheck } from "lucide-react";
+import { Activity, CheckCircle2, CircleAlert, Database, KeyRound, ShieldCheck, Waves } from "lucide-react";
+import { analyzerDataSettings } from "@/lib/analyzer/analyzer-data-settings";
 import { getProviderStatuses, type ProviderStatus } from "@/lib/data/provider-status";
+import { marketDataSettings } from "@/lib/market-data/market-data-settings";
 import { cn } from "@/lib/utils";
 
 // dynamic keeps provider env/cache status current instead of baking it into a build-time page.
@@ -10,7 +12,9 @@ export default function DataProvidersPage() {
   const providers = getProviderStatuses();
   const readyCount = providers.filter((provider) => provider.enabled).length;
   const cacheCount = providers.reduce((total, provider) => total + provider.cacheEntries, 0);
+  const freshCacheCount = providers.reduce((total, provider) => total + provider.cacheFreshEntries, 0);
   const firstMissingProvider = providers.find((provider) => !provider.enabled);
+  const analyzerMode = analyzerDataSettings.activeSource === "research" ? "Research-first" : "Mock OHLC";
 
   return (
     <div className="space-y-4">
@@ -24,8 +28,39 @@ export default function DataProvidersPage() {
 
       <section className="grid gap-3 md:grid-cols-3">
         <SummaryCard icon={ShieldCheck} label="Offline Safe" value="Always" detail="Missing keys disable providers instead of breaking the app." tone="positive" />
-        <SummaryCard icon={Database} label="SQLite Cache" value={String(cacheCount)} detail="Provider responses are cached locally before another API call is made." tone="accent" />
+        <SummaryCard icon={Database} label="SQLite Cache" value={`${freshCacheCount}/${cacheCount}`} detail="Fresh cached responses are reused before another API call is made." tone="accent" />
         <SummaryCard icon={KeyRound} label="Next Key" value={firstMissingProvider?.missingEnv[0] ?? "Complete"} detail={firstMissingProvider ? firstMissingProvider.label : "All optional providers are configured."} tone={firstMissingProvider ? "warning" : "positive"} />
+      </section>
+
+      <section className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.8fr)]">
+        <div className="rounded-xl border bg-card/90 p-3 shadow-[0_18px_45px_rgba(0,0,0,0.20)]">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-base font-semibold">Active Data Routing</h2>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">This shows what the app will try first today, before any provider keys are added.</p>
+            </div>
+            <span className="rounded-full border border-primary/40 bg-primary/10 px-2 py-1 font-mono text-[10px] text-primary">local-first</span>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-3">
+            <RoutingMetric label="Dashboard prices" value={formatSourceName(marketDataSettings.activeSource)} detail="Current share price and PADI still use the local market-data provider placeholder." />
+            <RoutingMetric label="Analyzer candles" value={analyzerMode} detail={`${analyzerDataSettings.candleLookbackDays} daily candles through /api/research first, with mock fallback.`} />
+            <RoutingMetric label="Secrets" value="Server only" detail="API keys are read from local env and never sent to browser components." />
+          </div>
+        </div>
+
+        <div className="rounded-xl border bg-card/90 p-3 shadow-[0_18px_45px_rgba(0,0,0,0.20)]">
+          <div className="flex items-start gap-3">
+            <div className="soft-pulse flex size-9 shrink-0 items-center justify-center rounded-xl border bg-[#191929] text-primary">
+              <Waves className="size-4" aria-hidden="true" />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold">No-Key Behavior</h2>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                Without keys, research endpoints return safely with mock or empty provider sections. Once keys are added, the same routes start filling SQLite cache records.
+              </p>
+            </div>
+          </div>
+        </div>
       </section>
 
       <section className="rounded-xl border bg-card/90 p-3 shadow-[0_18px_45px_rgba(0,0,0,0.20)]">
@@ -158,9 +193,28 @@ function ProviderCard({ provider }: { provider: ProviderStatus }) {
       <p className="mt-3 text-xs leading-5 text-muted-foreground">{provider.detail}</p>
 
       <div className="mt-3 grid grid-cols-3 gap-2">
-        <MiniMetric label="Cache" value={String(provider.cacheEntries)} />
-        <MiniMetric label="Used" value={provider.usage} />
+        <MiniMetric label="Cache" value={provider.cacheLabel} />
+        <MiniMetric label="Fresh/Stale" value={`${provider.cacheFreshEntries}/${provider.cacheStaleEntries}`} />
         <MiniMetric label="Limit" value={provider.quota} />
+      </div>
+
+      <div className="mt-3 rounded-xl border bg-[#191929] p-3">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <p className="text-xs font-semibold uppercase text-primary">API Budget Guard</p>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">{provider.usageDetail}</p>
+          </div>
+          <span
+            className={cn(
+              "rounded-full border px-2 py-1 font-mono text-[10px]",
+              provider.usageTone === "positive" && "border-emerald-300/30 text-emerald-300",
+              provider.usageTone === "accent" && "border-primary/40 text-primary",
+              provider.usageTone === "warning" && "border-amber-200/30 text-amber-200",
+            )}
+          >
+            {provider.usage}
+          </span>
+        </div>
       </div>
 
       <div className="mt-3 rounded-xl border bg-[#191929] p-3">
@@ -189,6 +243,22 @@ function ProviderCard({ provider }: { provider: ProviderStatus }) {
   );
 }
 
+// RoutingMetric renders one active local/live data route on the provider control panel.
+function RoutingMetric({ detail, label, value }: { detail: string; label: string; value: string }) {
+  return (
+    <div className="rounded-xl border bg-[#191929] p-3">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="truncate text-[10px] uppercase text-muted-foreground">{label}</p>
+          <p className="mt-1 truncate font-mono text-xs font-semibold text-primary">{value}</p>
+        </div>
+        <Activity className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+      </div>
+      <p className="mt-2 text-xs leading-5 text-muted-foreground">{detail}</p>
+    </div>
+  );
+}
+
 // MiniMetric renders one dense provider counter inside a provider card.
 function MiniMetric({ label, value }: { label: string; value: string }) {
   return (
@@ -197,4 +267,16 @@ function MiniMetric({ label, value }: { label: string; value: string }) {
       <p className="mt-1 truncate font-mono text-xs font-semibold text-foreground">{value}</p>
     </div>
   );
+}
+
+// formatSourceName converts internal provider ids into compact user-facing labels.
+function formatSourceName(value: string) {
+  const labels: Record<string, string> = {
+    "local-placeholder": "Local placeholder",
+    live: "Live provider",
+    mock: "Mock",
+    research: "Research cache",
+  };
+
+  return labels[value] ?? value;
 }

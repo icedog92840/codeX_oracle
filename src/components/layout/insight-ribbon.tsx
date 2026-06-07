@@ -208,10 +208,11 @@ function ProviderStatusCard({ provider }: { provider: ProviderStatus }) {
       </div>
       <p className="mt-2 text-xs leading-5 text-muted-foreground">{provider.detail}</p>
       <div className="mt-3 grid grid-cols-3 gap-1.5">
-        <ProviderMiniMetric label="Cache" value={String(provider.cacheEntries)} />
-        <ProviderMiniMetric label="Used" value={provider.usage} />
+        <ProviderMiniMetric label="Cache" value={provider.cacheLabel} />
+        <ProviderMiniMetric label="Fresh/Stale" value={`${provider.cacheFreshEntries}/${provider.cacheStaleEntries}`} />
         <ProviderMiniMetric label="Limit" value={provider.quota} />
       </div>
+      <p className="mt-2 text-[10px] leading-4 text-muted-foreground">{provider.usageDetail}</p>
       {!provider.enabled ? (
         <p className="mt-2 truncate font-mono text-[10px] text-amber-200">{provider.missingEnv.join(", ")}</p>
       ) : null}

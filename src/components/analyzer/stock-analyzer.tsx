@@ -727,6 +727,7 @@ function SnapshotDrawer({
   ticker: string;
 }) {
   const latestScan = snapshot?.latestScan ?? null;
+  const latestScorecard = latestScan?.metrics.valueScorecard ?? null;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/55 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label={`${ticker} saved scan snapshot`}>
@@ -791,6 +792,23 @@ function SnapshotDrawer({
                 <SnapshotMetric label="50-day SMA" value={formatMaybeCurrency(latestScan.metrics.sma50)} />
                 <SnapshotMetric label="200-day SMA" value={formatMaybeCurrency(latestScan.metrics.sma200)} />
               </section>
+
+              {latestScorecard ? (
+                <section className="rounded-xl border bg-card/90 p-3">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h4 className="text-base font-semibold">Owner Grade Data</h4>
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                        Saved Graham/Buffett input quality for this scan snapshot.
+                      </p>
+                    </div>
+                    <DataConfidenceBadge confidence={getValueDataConfidence(latestScorecard)} />
+                  </div>
+                  <p className="mt-3 rounded-xl border bg-[#191929] p-3 text-xs leading-5 text-muted-foreground">
+                    This badge travels with saved scans, so an older watchlist snapshot can be compared against a newer provider-backed scan after you re-run the ticker.
+                  </p>
+                </section>
+              ) : null}
 
               <section className="rounded-xl border bg-card/90 p-3">
                 <div className="flex items-center justify-between gap-3">

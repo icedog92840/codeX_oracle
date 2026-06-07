@@ -32,7 +32,7 @@ export default function DataProvidersPage() {
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h2 className="text-base font-semibold">Local `.env.local` Checklist</h2>
-            <p className="mt-1 text-xs text-muted-foreground">Add only the providers you want. Secret values stay server-side and should not be committed.</p>
+            <p className="mt-1 text-xs text-muted-foreground">Copy `.env.example` to `.env.local`, add only the providers you want, then restart the dev server. Secret values stay server-side and should not be committed.</p>
           </div>
           <span className="rounded-full border bg-[#191929] px-2 py-1 font-mono text-[10px] text-muted-foreground">restart dev server after edits</span>
         </div>

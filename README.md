@@ -4,7 +4,7 @@ Compact local financial portfolio dashboard built with Next.js, React, Tailwind 
 
 ## Current Status
 
-The app is past the original Version 1.0 baseline and is currently tagged at `v1.2-market-provider-qa`.
+The app is past the original Version 1.0 baseline and is currently tagged at `v1.3-analyzer-persistence-value-score`.
 
 - Next.js App Router, React, Tailwind CSS, and shadcn-compatible UI primitives.
 - Dark mobile-friendly fintech theme based on the uploaded dashboard reference image.
@@ -23,7 +23,7 @@ The app is past the original Version 1.0 baseline and is currently tagged at `v1
 - `Transaction_Log.csv`: Parsed dynamically on server-rendered routes for holdings, dividends, DRIP, transactions, and dashboard calculations.
 - Market prices/yields: Local placeholders only. The provider interface lives in `src/lib/market-data`.
 - Analyzer OHLC candles: Deterministic local mock data only. The provider interface lives in `src/lib/analyzer`. No external indicator API is used.
-- Analyzer value metrics: Deterministic local estimates until SEC/FMP fundamentals are wired into scan payloads.
+- Analyzer value metrics: SEC fundamentals when configured, with deterministic local estimates as fallback.
 - Future live research data: See `LIVE_DATA_SETUP.md` for Twelve Data, SEC EDGAR, FMP, Alpha Vantage, RSS, SQLite cache TTLs, and API-budget safety.
 
 ## Local Commands
@@ -51,3 +51,4 @@ Stable reference tags:
 - `v1.1-ui-polish`: UI polish and analyzer-era refinements.
 - `v1.1.1-data-fix`: Robinhood `BCXL` correction-row handling.
 - `v1.2-market-provider-qa`: Market-data resolver prep plus mobile dividend QA cleanup.
+- `v1.3-analyzer-persistence-value-score`: SQLite analyzer persistence, provider status, research refresh, and Graham/Buffett SEC fallback wiring.

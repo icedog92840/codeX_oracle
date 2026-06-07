@@ -12,11 +12,11 @@ The app is local-first. Live provider calls are disabled unless the matching env
 
 ## Environment Variables
 
-Create `.env.local` locally. Do not commit it.
+Copy `.env.example` to `.env.local`, paste only the keys you want to use, then restart the dev server. Do not commit `.env.local`.
 
 ```text
-TWELVE_DATA_API_KEY=
 SEC_EDGAR_USER_AGENT=Your Name your-email@example.com
+TWELVE_DATA_API_KEY=
 FMP_API_KEY=
 ALPHA_VANTAGE_API_KEY=
 STOCK_NEWS_RSS_URL_TEMPLATE=
@@ -47,12 +47,30 @@ Configured guardrails:
 - SEC EDGAR: 300 requests per minute, 5000 per day
 - RSS: 30 requests per minute, 1000 per day
 
+## Provider Endpoint Map
+
+The code is key-ready for these provider paths:
+
+- SEC EDGAR fundamentals: `https://data.sec.gov/api/xbrl/companyfacts/CIK##########.json`
+- Twelve Data quote: `https://api.twelvedata.com/quote`
+- Twelve Data daily candles: `https://api.twelvedata.com/time_series?interval=1day`
+- FMP quote fallback: `https://financialmodelingprep.com/stable/quote`
+- FMP ticker news: `https://financialmodelingprep.com/stable/news/stock`
+- Alpha Vantage OHLC fallback: `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY`
+- RSS fallback: `STOCK_NEWS_RSS_URL_TEMPLATE` with `{ticker}` replaced by the ticker symbol.
+
 ## Server API
 
 The browser should call:
 
 ```text
 /api/research/AAPL
+```
+
+To force a budget-guarded provider refresh:
+
+```text
+/api/research/AAPL?refresh=1
 ```
 
 That route keeps API keys on the server and returns a cached research snapshot:
@@ -92,4 +110,4 @@ The analyzer currently combines:
 - Technical Timing Grade
 - News/filing context
 
-The Graham/Buffett inputs are deterministic local estimates until SEC/FMP fundamentals are wired into the scan payload. Technical indicators are kept as a small timing layer, not the main owner-grade score.
+The Graham/Buffett inputs now use SEC fundamentals when configured and fall back to deterministic local estimates for missing fields. Technical indicators are kept as a small timing layer, not the main owner-grade score.

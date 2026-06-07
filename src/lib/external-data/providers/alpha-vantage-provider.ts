@@ -3,18 +3,19 @@ import { fetchJsonWithCache } from "@/lib/external-data/http-client";
 import { buildSourceFreshness } from "@/lib/external-data/freshness";
 import type { HistoricalOhlc } from "@/lib/external-data/types";
 
-// AlphaVantageDailyResponse matches the adjusted daily endpoint fields we use as a fallback.
+// AlphaVantageDailyResponse matches the free daily endpoint fields we use as a fallback.
 type AlphaVantageDailyResponse = {
   "Time Series (Daily)"?: Record<string, {
     "1. open": string;
     "2. high": string;
     "3. low": string;
     "4. close": string;
+    "5. volume"?: string;
     "6. volume"?: string;
   }>;
 };
 
-// getAlphaVantageHistoricalOhlc returns fallback daily candles when ALPHA_VANTAGE_API_KEY is configured.
+// getAlphaVantageHistoricalOhlc returns fallback daily candles from the free TIME_SERIES_DAILY endpoint.
 export async function getAlphaVantageHistoricalOhlc(ticker: string, outputSize = 200, options: { forceRefresh?: boolean } = {}): Promise<HistoricalOhlc | null> {
   const availability = getProviderAvailability("alpha-vantage");
 
@@ -25,14 +26,14 @@ export async function getAlphaVantageHistoricalOhlc(ticker: string, outputSize =
   const symbol = normalizeTicker(ticker);
   const url = new URL("https://www.alphavantage.co/query");
   url.searchParams.set("apikey", process.env.ALPHA_VANTAGE_API_KEY ?? "");
-  url.searchParams.set("function", "TIME_SERIES_DAILY_ADJUSTED");
+  url.searchParams.set("function", "TIME_SERIES_DAILY");
   url.searchParams.set("outputsize", "compact");
   url.searchParams.set("symbol", symbol);
 
   const response = await fetchJsonWithCache<AlphaVantageDailyResponse>({
     budget: freeApiBudgets.alphaVantage,
     cacheParts: { outputSize, symbol },
-    endpoint: "daily_adjusted",
+    endpoint: "daily",
     forceRefresh: options.forceRefresh,
     provider: "alpha-vantage",
     ttlMs: cacheTtls.historicalOhlc,
@@ -50,7 +51,7 @@ export async function getAlphaVantageHistoricalOhlc(ticker: string, outputSize =
         high: Number(value["2. high"]),
         low: Number(value["3. low"]),
         open: Number(value["1. open"]),
-        volume: value["6. volume"] ? Number(value["6. volume"]) : undefined,
+        volume: value["5. volume"] || value["6. volume"] ? Number(value["5. volume"] ?? value["6. volume"]) : undefined,
       })),
     freshness: buildSourceFreshness(response),
     source: "alpha-vantage",

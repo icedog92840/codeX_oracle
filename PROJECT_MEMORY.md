@@ -8,13 +8,14 @@ This file preserves the current project state for future Codex turns if chat con
 - Local CSV source: `Transaction_Log.csv` in the project root.
 - The app dynamically parses the local Robinhood CSV on server-rendered routes.
 - Dark fintech theme is based on the uploaded dashboard image.
-- Current pushed checkpoint: `v1.2-market-provider-qa`.
+- Current stable checkpoint: `v1.3-analyzer-persistence-value-score`.
 - Important routes:
   - `/` dashboard
   - `/dividends` dividend tracker
   - `/drip` DRIP compounding visualizer
   - `/transactions` paged transaction verifier
   - `/analyzer` local mock-OHLC stock analyzer
+  - `/data-providers` provider setup and cache/budget status
 
 ## Completed Highlights
 
@@ -47,7 +48,7 @@ This file preserves the current project state for future Codex turns if chat con
   - Local SMA, support/resistance, RSI, and MACD calculations.
   - Transparent 0-100 technical scoring, A-F grade, signal chips, score breakdown, and rule-based summary.
   - Graham Defensive, Buffett Quality, and combined Owner Grade scorecards with metric popout explanations.
-  - Value score fundamentals are deterministic local estimates until SEC fundamentals are wired into scan payloads.
+  - Value score fundamentals use SEC data when configured and deterministic local estimates for missing fields.
   - Browser localStorage recent scans and watchlist, mirrored into SQLite for durability.
   - Watchlist ticker clicks open a saved scan snapshot drawer backed by SQLite.
   - Analyzer added to desktop nav and mobile bottom nav as `Scan`.
@@ -61,8 +62,11 @@ This file preserves the current project state for future Codex turns if chat con
   - Future-ready tables for analyzer scans, watchlist items, news, CSV imports, and app settings.
   - Provider adapters for Twelve Data, SEC EDGAR, Alpha Vantage, FMP, and configurable RSS news.
   - Server route `/api/research/[ticker]` for cached quote/candles/fundamentals/news without exposing API keys.
+  - `/api/research/[ticker]?refresh=1` for budget-guarded provider refreshes.
   - Server routes `/api/analyzer/scans` and `/api/watchlist` for SQLite-backed scan and watchlist persistence.
   - Server route `/api/analyzer/snapshot/[ticker]` for saved scan history plus cached news.
+  - `.env.example` lists every key-ready provider variable while `.env.local` remains ignored.
+  - FMP is the recommended free-first news path; RSS remains a no-cost fallback if FMP news is gated.
   - Setup notes in `LIVE_DATA_SETUP.md`.
 - Mobile dividend payout chart tooltip overflow was fixed by making first/last bar popovers align inward.
 
@@ -72,13 +76,14 @@ This file preserves the current project state for future Codex turns if chat con
 - `v1.1-ui-polish`: UI polish and analyzer-era refinements.
 - `v1.1.1-data-fix`: Robinhood `BCXL` correction-row handling.
 - `v1.2-market-provider-qa`: Market-data resolver prep plus mobile dividend QA cleanup.
+- `v1.3-analyzer-persistence-value-score`: SQLite analyzer persistence, provider status, research refresh, and Graham/Buffett SEC fallback wiring.
 
 ## Current Next Steps
 
-1. Keep the app local-first while preparing clean extension points for future live data.
-2. Add a dedicated settings/data page for provider choices, cache status, and assumptions if the top-ribbon Data popout becomes too compact.
-3. Wire analyzer UI to `/api/research/[ticker]` only after API keys/env are configured and the fallback behavior is reviewed.
-4. Replace local estimated value-score inputs with SEC/FMP fundamentals when provider data is configured.
+1. Add provider keys to `.env.local`, restart the dev server, and test `/api/research/[ticker]?refresh=1`.
+2. Confirm FMP headlines save into SQLite and display with provider source tags in the snapshot drawer.
+3. Wire live/cached quote and OHLC into analyzer scans while keeping mock fallback.
+4. Improve Graham/Buffett scoring with more real multi-year fundamentals after provider coverage is proven.
 
 ## Verification Commands
 

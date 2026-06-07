@@ -13,6 +13,7 @@ type FmpQuoteResponse = Array<{
 
 // FmpNewsResponse matches the stock-news fields used from Financial Modeling Prep.
 type FmpNewsResponse = Array<{
+  date?: string;
   image?: string;
   publishedDate?: string;
   site?: string;
@@ -31,8 +32,9 @@ export async function getFmpQuote(ticker: string, options: { forceRefresh?: bool
   }
 
   const symbol = normalizeTicker(ticker);
-  const url = new URL(`https://financialmodelingprep.com/api/v3/quote/${symbol}`);
+  const url = new URL("https://financialmodelingprep.com/stable/quote");
   url.searchParams.set("apikey", process.env.FMP_API_KEY ?? "");
+  url.searchParams.set("symbol", symbol);
   const response = await fetchJsonWithCache<FmpQuoteResponse>({
     budget: freeApiBudgets.fmp,
     cacheParts: { symbol },
@@ -67,10 +69,10 @@ export async function getFmpStockNews(ticker: string, limit = 10, options: { for
   }
 
   const symbol = normalizeTicker(ticker);
-  const url = new URL("https://financialmodelingprep.com/api/v3/stock_news");
+  const url = new URL("https://financialmodelingprep.com/stable/news/stock");
   url.searchParams.set("apikey", process.env.FMP_API_KEY ?? "");
   url.searchParams.set("limit", String(limit));
-  url.searchParams.set("tickers", symbol);
+  url.searchParams.set("symbols", symbol);
   const response = await fetchJsonWithCache<FmpNewsResponse>({
     budget: freeApiBudgets.fmp,
     cacheParts: { limit, symbol },
@@ -84,7 +86,7 @@ export async function getFmpStockNews(ticker: string, limit = 10, options: { for
   return response.data
     .filter((item) => item.title && item.url)
     .map((item) => ({
-      publishedAt: item.publishedDate,
+      publishedAt: item.publishedDate ?? item.date,
       freshness: buildSourceFreshness(response),
       source: "fmp",
       sourceName: item.site,

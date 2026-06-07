@@ -9,6 +9,7 @@ export type ProviderStatus = {
   detail: string;
   enabled: boolean;
   envKeys: string[];
+  futureOptions: string[];
   label: string;
   missingEnv: string[];
   provider: ExternalDataSource;
@@ -43,6 +44,7 @@ export function getProviderStatuses(): ProviderStatus[] {
         : `${meta.label} is offline-safe until ${availability.missingEnv.join(", ")} is added to local env.${cacheDetail}`,
       enabled,
       envKeys: meta.envKeys,
+      futureOptions: meta.futureOptions,
       label: meta.label,
       missingEnv: availability.missingEnv,
       provider,
@@ -93,36 +95,42 @@ const providerOrder: ExternalDataSource[] = ["sec-edgar", "twelve-data", "fmp", 
 const providerMeta: Record<ExternalDataSource, {
   capabilities: string[];
   envKeys: string[];
+  futureOptions: string[];
   label: string;
   setupNote: string;
 }> = {
   "alpha-vantage": {
     capabilities: ["Fallback historical OHLC candles"],
     envKeys: ["ALPHA_VANTAGE_API_KEY"],
+    futureOptions: ["Keep as OHLC fallback if Twelve Data becomes the primary candle provider.", "Could be replaced by Polygon, Tiingo, or paid FMP historical data later."],
     label: "Alpha Vantage",
     setupNote: "Useful as a backup OHLC source when Twelve Data is not configured or unavailable.",
   },
   fmp: {
-    capabilities: ["Fallback quote", "Ticker news headlines"],
+    capabilities: ["Recommended news provider", "Fallback quote", "Ticker news headlines"],
     envKeys: ["FMP_API_KEY"],
+    futureOptions: ["Stay on the free Basic key while calls fit inside local cache and budget guards.", "If stock news is gated for your key, upgrade later to Starter or switch news to RSS without changing the drawer UI.", "Future paid options can add FMP fundamentals, analyst ratings, price targets, or broader market news."],
     label: "Financial Modeling Prep",
-    setupNote: "Useful for quote fallback and stock-specific news once an FMP key is added.",
+    setupNote: "Recommended first for news. Add the free key as FMP_API_KEY; the app uses cached ticker news and falls back safely if a specific endpoint is unavailable on the free plan.",
   },
   "rss-news": {
     capabilities: ["Custom ticker news feed"],
     envKeys: ["STOCK_NEWS_RSS_URL_TEMPLATE"],
+    futureOptions: ["Use as the no-cost backup if FMP news is limited.", "Can point at any RSS provider that supports a {ticker} URL template."],
     label: "RSS News",
     setupNote: "Use a URL template containing {ticker}; refreshed headlines are cached in SQLite.",
   },
   "sec-edgar": {
     capabilities: ["Fundamentals", "Graham/Buffett scoring inputs"],
     envKeys: ["SEC_EDGAR_USER_AGENT"],
+    futureOptions: ["Keep as the trusted fundamentals baseline even if paid fundamentals are added later.", "Future scoring can add more SEC facts for earnings stability and multi-year growth."],
     label: "SEC EDGAR",
     setupNote: "Recommended first. SEC asks for a contact-style User-Agent such as an email or app/contact string.",
   },
   "twelve-data": {
     capabilities: ["Live/delayed quote", "Historical OHLC candles"],
     envKeys: ["TWELVE_DATA_API_KEY"],
+    futureOptions: ["Use for live/cached analyzer candles if the free tier fits your scan frequency.", "Can be swapped for Polygon, Tiingo, or paid FMP market data later through the same provider interface."],
     label: "Twelve Data",
     setupNote: "Best first market-data key for analyzer quote and historical candle replacement.",
   },

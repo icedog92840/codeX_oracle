@@ -44,6 +44,23 @@ export default function DataProvidersPage() {
         </div>
       </section>
 
+      <section className="rounded-xl border bg-card/90 p-3 shadow-[0_18px_45px_rgba(0,0,0,0.20)]">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="text-base font-semibold">Recommended News Path</h2>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              Use FMP first with a free key. The app caches ticker news in SQLite, respects local budget guards, and falls back safely if an endpoint is not available on your plan.
+            </p>
+          </div>
+          <span className="rounded-full border border-primary/40 bg-primary/10 px-2 py-1 font-mono text-[10px] text-primary">FMP first</span>
+        </div>
+        <div className="mt-3 grid gap-2 md:grid-cols-3">
+          <MiniMetric label="Now" value="FMP free key" />
+          <MiniMetric label="Fallback" value="RSS template" />
+          <MiniMetric label="Later" value="Paid data add-ons" />
+        </div>
+      </section>
+
       <section className="grid gap-3 xl:grid-cols-2">
         {providers.map((provider) => (
           <ProviderCard key={provider.provider} provider={provider} />
@@ -156,6 +173,17 @@ function ProviderCard({ provider }: { provider: ProviderStatus }) {
           ))}
         </div>
         <p className="mt-3 text-xs leading-5 text-muted-foreground">{provider.setupNote}</p>
+      </div>
+
+      <div className="mt-3 rounded-xl border bg-[#191929] p-3">
+        <p className="text-xs font-semibold uppercase text-primary">Future Options</p>
+        <div className="mt-2 grid gap-1.5">
+          {provider.futureOptions.map((option) => (
+            <p key={option} className="text-xs leading-5 text-muted-foreground">
+              {option}
+            </p>
+          ))}
+        </div>
       </div>
     </article>
   );

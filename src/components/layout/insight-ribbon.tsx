@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
 import { BarChart3, ChevronRight, Database, Pause, Sparkles, X } from "lucide-react";
-import type { InsightChip, InsightDataStatusItem, InsightProviderStatus, InsightRibbonData, InsightRoutePayload } from "@/lib/data/insight-ribbon";
+import type { InsightChip, InsightDataStatusItem, InsightRibbonData, InsightRoutePayload } from "@/lib/data/insight-ribbon";
+import type { ProviderStatus } from "@/lib/data/provider-status";
 import { cn } from "@/lib/utils";
 
 // InsightRibbon replaces the old search placeholder with page-aware local portfolio context.
@@ -142,7 +143,7 @@ export function InsightRibbon({ data }: { data: InsightRibbonData }) {
 }
 
 // DataStatusPanel explains which app values are CSV-backed, placeholder-backed, or provider-backed.
-function DataStatusPanel({ items, onClose, providers }: { items: InsightDataStatusItem[]; onClose: () => void; providers: InsightProviderStatus[] }) {
+function DataStatusPanel({ items, onClose, providers }: { items: InsightDataStatusItem[]; onClose: () => void; providers: ProviderStatus[] }) {
   return (
     <div className="pill-scrollbar absolute inset-x-0 top-0 z-40 max-h-[min(78vh,680px)] overflow-y-auto rounded-2xl border bg-[#191929]/98 p-3 shadow-[0_22px_60px_rgba(0,0,0,0.48)] ring-1 ring-primary/15 backdrop-blur">
       <div className="flex items-start gap-3">
@@ -185,7 +186,7 @@ function DataStatusPanel({ items, onClose, providers }: { items: InsightDataStat
 }
 
 // ProviderStatusCard renders one optional API/feed status without exposing any secret values.
-function ProviderStatusCard({ provider }: { provider: InsightProviderStatus }) {
+function ProviderStatusCard({ provider }: { provider: ProviderStatus }) {
   return (
     <div className="rounded-xl border bg-[#202034]/75 p-3">
       <div className="flex min-w-0 items-start justify-between gap-2">
@@ -287,6 +288,10 @@ function getRoutePayload(pathname: string, data: InsightRibbonData, analyzerSnap
 
   if (pathname.startsWith("/analyzer")) {
     return analyzerSnapshot ?? data.analyzer;
+  }
+
+  if (pathname.startsWith("/data-providers")) {
+    return data.dataProviders;
   }
 
   return data.dashboard;

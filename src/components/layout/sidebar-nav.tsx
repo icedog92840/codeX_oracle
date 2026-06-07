@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChartNoAxesCombined, ChevronUp, History, LayoutDashboard, Repeat2, ScanSearch, Wrench } from "lucide-react";
+import { ChartNoAxesCombined, ChevronUp, Database, History, LayoutDashboard, Repeat2, ScanSearch, Wrench } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // Navigation items map every app route to the desktop sidebar.
@@ -12,6 +12,7 @@ const navItems = [
   { href: "/drip", label: "DRIP", mobileLabel: "DRIP", icon: Repeat2 },
   { href: "/transactions", label: "Transactions", mobileLabel: "History", icon: History },
   { href: "/analyzer", label: "Analyzer", mobileLabel: "Scan", icon: ScanSearch },
+  { href: "/data-providers", label: "Data Providers", mobileLabel: "Data", icon: Database },
 ];
 
 // mobilePrimaryItems stay visible in the bottom bar so core portfolio routes are always one tap away.
@@ -25,6 +26,7 @@ const mobilePrimaryItems = [
 const mobileToolItems = [
   { href: "/drip", label: "DRIP", mobileLabel: "DRIP", icon: Repeat2 },
   { href: "/analyzer", label: "Analyzer", mobileLabel: "Scan", icon: ScanSearch },
+  { href: "/data-providers", label: "Data Providers", mobileLabel: "Data", icon: Database },
 ];
 
 // SidebarNav highlights the active route in either desktop sidebar or mobile bottom-bar form.

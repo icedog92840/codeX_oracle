@@ -3,11 +3,9 @@ import { join } from "node:path";
 import { analyzerDataSettings } from "@/lib/analyzer/analyzer-data-settings";
 import { buildPortfolioHoldings, buildPortfolioSummary } from "@/lib/calculations/portfolio";
 import { formatCurrency, formatPercent, formatShares } from "@/lib/calculations/format";
-import { getSqlite } from "@/lib/db/connection";
-import { freeApiBudgets, getProviderAvailability } from "@/lib/external-data/provider-config";
+import { getProviderStatuses, type ProviderStatus } from "@/lib/data/provider-status";
 import { getMarketDataProvider } from "@/lib/market-data/market-data-resolver";
 import { parseRobinhoodCsv } from "@/lib/parsing/robinhood";
-import type { ExternalDataSource } from "@/lib/external-data/types";
 import type { NormalizedTransaction } from "@/lib/types/transactions";
 
 // InsightChip stores one compact metric shown in the page-aware top ribbon.
@@ -31,19 +29,6 @@ export type InsightDataStatusItem = {
   tone?: "accent" | "positive" | "neutral" | "warning";
 };
 
-// InsightProviderStatus explains one optional external provider without exposing secrets.
-export type InsightProviderStatus = {
-  cacheEntries: number;
-  detail: string;
-  enabled: boolean;
-  label: string;
-  missingEnv: string[];
-  provider: ExternalDataSource;
-  quota: string;
-  tone: "accent" | "positive" | "neutral" | "warning";
-  usage: string;
-};
-
 // InsightRibbonData stores every route's ribbon content plus shared investing principles.
 export type InsightRibbonData = {
   dashboard: InsightRoutePayload;
@@ -51,9 +36,10 @@ export type InsightRibbonData = {
   transactions: InsightRoutePayload;
   drip: InsightRoutePayload;
   analyzer: InsightRoutePayload;
+  dataProviders: InsightRoutePayload;
   principles: string[];
   dataStatus: InsightDataStatusItem[];
-  providerStatus: InsightProviderStatus[];
+  providerStatus: ProviderStatus[];
 };
 
 // getInsightRibbonData reads the local CSV once and builds compact route-aware briefing data.
@@ -75,7 +61,10 @@ export function getInsightRibbonData(): InsightRibbonData {
   const dripStats = buildDripStats(transactions);
   const analyzerModeLabel = analyzerDataSettings.activeSource === "mock" ? "Mock OHLC" : "Live OHLC";
   const analyzerFeedLabel = analyzerDataSettings.activeSource === "mock" ? "Offline" : analyzerDataSettings.liveProviderName;
-  const providerStatus = buildProviderStatus();
+  const providerStatus = getProviderStatuses();
+  const readyProviders = providerStatus.filter((provider) => provider.enabled).length;
+  const totalProviderCacheEntries = providerStatus.reduce((total, provider) => total + provider.cacheEntries, 0);
+  const nextMissingProvider = providerStatus.find((provider) => !provider.enabled);
 
   return {
     dashboard: {
@@ -143,6 +132,19 @@ export function getInsightRibbonData(): InsightRibbonData {
         "The market-data provider is isolated so live quotes can be plugged in later without rewriting the UI.",
       ],
     },
+    dataProviders: {
+      chips: [
+        { label: "Ready", value: `${readyProviders}/${providerStatus.length}`, tone: readyProviders > 0 ? "positive" : "warning" },
+        { label: "Cache", value: String(totalProviderCacheEntries), tone: "accent" },
+        { label: "Next Key", value: nextMissingProvider?.missingEnv[0] ?? "Complete", tone: nextMissingProvider ? "warning" : "positive" },
+        { label: "Mode", value: "Offline Safe", tone: "neutral" },
+      ],
+      briefings: [
+        "Provider keys stay server-side; the browser sees readiness, source names, cache age, and usage counters only.",
+        nextMissingProvider ? `${nextMissingProvider.label} is the next missing provider setup item.` : "All optional provider environment variables are configured.",
+        "Provider cache and budget guards are local SQLite-backed so repeated scans avoid unnecessary API calls.",
+      ],
+    },
     principles: [
       "Risk first, return second: staying solvent keeps every future opportunity available.",
       "A durable portfolio is easier to hold when the data is clear and the assumptions are visible.",
@@ -178,92 +180,6 @@ export function getInsightRibbonData(): InsightRibbonData {
     providerStatus,
   };
 }
-
-// buildProviderStatus reports env readiness, local cache entries, and free-tier guardrails.
-function buildProviderStatus(): InsightProviderStatus[] {
-  const cacheRows = readProviderCacheRows();
-  const usageRows = readProviderUsageRows();
-
-  return providerOrder.map((provider) => {
-    const availability = getProviderAvailability(provider);
-    const cacheEntries = cacheRows.filter((row) => row.provider === provider).length;
-    const latestCache = cacheRows
-      .filter((row) => row.provider === provider)
-      .sort((left, right) => right.fetchedAt.localeCompare(left.fetchedAt))[0];
-    const usage = usageRows.find((row) => row.provider === provider);
-    const budget = budgetByProvider[provider];
-    const label = providerLabels[provider];
-    const enabled = availability.enabled;
-    const cacheDetail = latestCache ? ` Latest cache fetch: ${formatDateTime(latestCache.fetchedAt)}.` : " No cached responses yet.";
-
-    return {
-      cacheEntries,
-      detail: enabled
-        ? `${label} is configured locally. Keys stay server-side and are never sent to the browser.${cacheDetail}`
-        : `${label} is offline-safe until ${availability.missingEnv.join(", ")} is added to local env.${cacheDetail}`,
-      enabled,
-      label,
-      missingEnv: availability.missingEnv,
-      provider,
-      quota: `${budget.maxPerMinute}/min ${budget.maxPerDay}/day`,
-      tone: enabled ? "positive" : provider === "sec-edgar" ? "accent" : "warning",
-      usage: usage ? `${usage.minuteCount}/min ${usage.dayCount}/day` : "0/min 0/day",
-    };
-  });
-}
-
-// readProviderCacheRows returns lightweight cache metadata from local SQLite.
-function readProviderCacheRows(): Array<{ fetchedAt: string; provider: ExternalDataSource }> {
-  try {
-    return getSqlite()
-      .prepare("SELECT provider, fetched_at AS fetchedAt FROM provider_cache")
-      .all() as Array<{ fetchedAt: string; provider: ExternalDataSource }>;
-  } catch {
-    return [];
-  }
-}
-
-// readProviderUsageRows returns local request counters used by provider budget guards.
-function readProviderUsageRows(): Array<{ dayCount: number; minuteCount: number; provider: ExternalDataSource }> {
-  try {
-    return getSqlite()
-      .prepare("SELECT provider, day_count AS dayCount, minute_count AS minuteCount FROM api_usage")
-      .all() as Array<{ dayCount: number; minuteCount: number; provider: ExternalDataSource }>;
-  } catch {
-    return [];
-  }
-}
-
-// formatDateTime keeps provider cache timestamps compact inside the Data popout.
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat("en-US", {
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    month: "short",
-  }).format(new Date(value));
-}
-
-// providerOrder controls the display order for the Data Providers panel.
-const providerOrder: ExternalDataSource[] = ["sec-edgar", "twelve-data", "fmp", "alpha-vantage", "rss-news"];
-
-// providerLabels gives provider slugs clean user-facing names.
-const providerLabels: Record<ExternalDataSource, string> = {
-  "alpha-vantage": "Alpha Vantage",
-  fmp: "Financial Modeling Prep",
-  "rss-news": "RSS News",
-  "sec-edgar": "SEC EDGAR",
-  "twelve-data": "Twelve Data",
-};
-
-// budgetByProvider lets the panel show local guardrails without duplicating provider budgets in UI code.
-const budgetByProvider = {
-  "alpha-vantage": freeApiBudgets.alphaVantage,
-  fmp: freeApiBudgets.fmp,
-  "rss-news": freeApiBudgets.rssNews,
-  "sec-edgar": freeApiBudgets.secEdgar,
-  "twelve-data": freeApiBudgets.twelveData,
-} satisfies Record<ExternalDataSource, { maxPerDay: number; maxPerMinute: number }>;
 
 // isCashDividend identifies Robinhood cash dividend rows.
 function isCashDividend(transaction: NormalizedTransaction) {

@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { buildPortfolioHoldings, buildPortfolioSummary } from "@/lib/calculations/portfolio";
 import { formatCurrency, formatPercent, formatShares } from "@/lib/calculations/format";
-import { localPlaceholderMarketDataProvider } from "@/lib/market-data/market-data-provider";
+import { getMarketDataProvider } from "@/lib/market-data/market-data-resolver";
 import { parseRobinhoodCsv } from "@/lib/parsing/robinhood";
 import type { NormalizedTransaction } from "@/lib/types/transactions";
 
@@ -33,7 +33,7 @@ export type InsightRibbonData = {
 export function getInsightRibbonData(): InsightRibbonData {
   const csvText = readFileSync(join(process.cwd(), "Transaction_Log.csv"), "utf-8");
   const transactions = parseRobinhoodCsv(csvText);
-  const marketData = localPlaceholderMarketDataProvider.getMarketData(transactions);
+  const marketData = getMarketDataProvider().getMarketData(transactions);
   const holdings = buildPortfolioHoldings(transactions, marketData);
   const summary = buildPortfolioSummary(holdings, transactions);
   const dividendTransactions = transactions.filter(isCashDividend);

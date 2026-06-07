@@ -14,7 +14,7 @@ import {
   formatSignedCurrency,
   formatSignedPercent,
 } from "@/lib/calculations/format";
-import { localPlaceholderMarketDataProvider } from "@/lib/market-data/market-data-provider";
+import { getMarketDataProvider } from "@/lib/market-data/market-data-resolver";
 import { parseRobinhoodCsv } from "@/lib/parsing/robinhood";
 import type { HoldingPreview, MetricCardValue } from "@/lib/types/dashboard";
 
@@ -22,7 +22,7 @@ import type { HoldingPreview, MetricCardValue } from "@/lib/types/dashboard";
 export function getPortfolioDashboardData() {
   const csvText = readFileSync(join(process.cwd(), "Transaction_Log.csv"), "utf-8");
   const transactions = parseRobinhoodCsv(csvText);
-  const marketData = localPlaceholderMarketDataProvider.getMarketData(transactions);
+  const marketData = getMarketDataProvider().getMarketData(transactions);
   const holdings = buildPortfolioHoldings(transactions, marketData);
   const summary = buildPortfolioSummary(holdings, transactions);
 

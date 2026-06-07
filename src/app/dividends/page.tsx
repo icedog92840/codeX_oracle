@@ -537,6 +537,12 @@ function TickerMetricPopover({ row, openUp }: { row: DividendAssetRow; openUp: b
             description="The largest single cash dividend payment ever received for this ticker in the CSV."
             formula="Maximum historical CDIV amount for this ticker across the full transaction log."
           />
+          <MetricDetail
+            label="Monthly Average"
+            value={formatFullCurrency(row.total / 12)}
+            description="Average monthly dividend income for this ticker in the currently selected range."
+            formula="Selected-range dividend total divided by 12 calendar months."
+          />
           <RecentDividendList row={row} />
         </div>
       </div>

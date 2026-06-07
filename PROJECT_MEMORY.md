@@ -13,6 +13,7 @@ This file preserves the current project state for future Codex turns if chat con
   - `/dividends` dividend tracker
   - `/drip` DRIP compounding visualizer
   - `/transactions` paged transaction verifier
+  - `/analyzer` local mock-OHLC stock analyzer
 
 ## Completed Highlights
 
@@ -40,6 +41,12 @@ This file preserves the current project state for future Codex turns if chat con
   - Dividend matrix is desktop-only; mobile renders stacked dividend asset cards.
   - Mobile navigation is a floating bottom bar with short labels.
 - Dividend ticker popouts now show the highest historical dividend payout received for that ticker across the full CSV, plus the last three historical dividend payments.
+- Stock Analyzer page added after Version 1.0:
+  - Deterministic mock OHLC provider for 200 daily candles.
+  - Local SMA, support/resistance, RSI, and MACD calculations.
+  - Transparent 0-100 technical scoring, A-F grade, signal chips, score breakdown, and rule-based summary.
+  - Browser localStorage recent scans and watchlist.
+  - Analyzer added to desktop nav and mobile bottom nav as `Scan`.
 - Current state is ready to discuss as a Version 1.0 candidate after user review.
 
 ## Current Next Steps
@@ -47,6 +54,7 @@ This file preserves the current project state for future Codex turns if chat con
 1. User review of the Version 1.0 candidate screenshots and live app.
 2. If approved, explicitly designate this baseline as Version 1.0 and commit/tag it.
 3. Future work can plug a live provider into `MarketDataProvider` without changing dashboard UI components.
+4. Analyzer can later swap `mockAnalyzerDataProvider` for a live historical OHLC provider and upgrade localStorage to SQLite/file storage.
 
 ## Verification Commands
 

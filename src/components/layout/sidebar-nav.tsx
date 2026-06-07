@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChartNoAxesCombined, History, LayoutDashboard, Repeat2 } from "lucide-react";
+import { ChartNoAxesCombined, History, LayoutDashboard, Repeat2, ScanSearch } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // Navigation items map the prompt's required pages to file-based routes.
@@ -11,6 +11,7 @@ const navItems = [
   { href: "/dividends", label: "Dividends", mobileLabel: "Divs", icon: ChartNoAxesCombined },
   { href: "/drip", label: "DRIP", mobileLabel: "DRIP", icon: Repeat2 },
   { href: "/transactions", label: "Transactions", mobileLabel: "History", icon: History },
+  { href: "/analyzer", label: "Analyzer", mobileLabel: "Scan", icon: ScanSearch },
 ];
 
 // SidebarNav highlights the active route in either desktop sidebar or mobile bottom-bar form.
@@ -20,7 +21,7 @@ export function SidebarNav({ variant = "sidebar" }: { variant?: "sidebar" | "mob
   if (variant === "mobile") {
     return (
       <nav
-        className="fixed inset-x-3 bottom-3 z-50 grid grid-cols-4 gap-1 rounded-2xl border bg-[#191929]/95 p-1.5 shadow-[0_18px_55px_rgba(0,0,0,0.45)] backdrop-blur lg:hidden"
+        className="fixed inset-x-3 bottom-3 z-50 grid grid-cols-5 gap-1 rounded-2xl border bg-[#191929]/95 p-1.5 shadow-[0_18px_55px_rgba(0,0,0,0.45)] backdrop-blur lg:hidden"
         aria-label="Mobile navigation"
       >
         {navItems.map((item) => {

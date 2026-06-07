@@ -612,19 +612,20 @@ function TechnicalSummary({ scan }: { scan: AnalyzerScan }) {
 
 // ScoreBreakdown renders the points that feed the final technical score.
 function ScoreBreakdown({ scan }: { scan: AnalyzerScan }) {
-  const buckets = [
-    { label: "Trend", value: scan.scoreBreakdown.trend, max: 40 },
-    { label: "Momentum", value: scan.scoreBreakdown.momentum, max: 25 },
-    { label: "Support", value: scan.scoreBreakdown.support, max: 20 },
-    { label: "MACD", value: scan.scoreBreakdown.macd, max: 15 },
-  ];
+  const buckets = buildTechnicalFormulaRows(scan);
 
   return (
     <section className="rounded-xl border bg-card/90 p-3 shadow-[0_18px_45px_rgba(0,0,0,0.20)]">
-      <h3 className="text-base font-semibold">Score Breakdown</h3>
-      <div className="mt-3 grid gap-2 md:grid-cols-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="text-base font-semibold">Technical Score Formula</h3>
+          <p className="mt-1 text-xs text-muted-foreground">Transparent point buckets behind the {scan.grade} / {scan.score} technical grade</p>
+        </div>
+        <FeedStatusBadge feedStatus={scan.feedStatus} />
+      </div>
+      <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
         {buckets.map((bucket) => (
-          <div key={bucket.label} className="rounded-xl border bg-[#191929] p-3">
+          <div key={bucket.label} className="group/formula relative rounded-xl border bg-[#191929] p-3">
             <div className="flex items-center justify-between gap-2 text-xs">
               <span className="text-muted-foreground">{bucket.label}</span>
               <span className="font-mono font-semibold">{bucket.value}/{bucket.max}</span>
@@ -632,11 +633,75 @@ function ScoreBreakdown({ scan }: { scan: AnalyzerScan }) {
             <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-secondary">
               <div className="h-full rounded-full bg-[linear-gradient(90deg,#38d5ff,#7c3aed)]" style={{ width: `${(bucket.value / bucket.max) * 100}%` }} />
             </div>
+            <div className="mt-3 flex items-center justify-between gap-2">
+              <p className="min-w-0 truncate font-mono text-[11px] text-muted-foreground">{bucket.valueText}</p>
+              <button
+                className="rounded-full p-1 text-muted-foreground outline-none transition-colors hover:text-primary focus-visible:text-primary"
+                type="button"
+                aria-label={`${bucket.label} formula explanation`}
+              >
+                <Info className="size-3.5" aria-hidden="true" />
+              </button>
+            </div>
+            <div className="pointer-events-none absolute right-0 top-[calc(100%+8px)] z-40 w-80 rounded-xl border bg-[#24243a] p-3 text-xs opacity-0 shadow-[0_18px_45px_rgba(0,0,0,0.38)] ring-1 ring-primary/10 transition-opacity group-hover/formula:opacity-100 group-focus-within/formula:opacity-100">
+              <p className="font-semibold text-foreground">{bucket.label}</p>
+              <p className="mt-2 leading-5 text-muted-foreground">{bucket.description}</p>
+              <p className="mt-2 rounded-lg border bg-[#191929] p-2 font-mono text-[11px] leading-5 text-primary">{bucket.formula}</p>
+              <p className="mt-2 text-[11px] leading-5 text-muted-foreground">{bucket.result}</p>
+            </div>
           </div>
         ))}
       </div>
+      <p className="mt-3 rounded-xl border bg-[#191929] p-3 text-xs leading-5 text-muted-foreground">
+        Technical score formula: Trend + Momentum + Support setup + MACD, capped at 100. This timing score contributes 10% of the combined Owner Grade.
+      </p>
     </section>
   );
+}
+
+// buildTechnicalFormulaRows converts technical indicators into explainable score rows.
+function buildTechnicalFormulaRows(scan: AnalyzerScan) {
+  const supportRange = Math.max(scan.resistance20 - scan.support20, 1);
+  const supportPosition = (scan.price - scan.support20) / supportRange;
+
+  return [
+    {
+      description: "Trend rewards price strength versus the 50-day and 200-day moving averages, plus a bullish 50/200-day relationship.",
+      formula: "Trend = 15 pts if price > 50 SMA + 15 pts if price > 200 SMA + 10 pts if 50 SMA > 200 SMA",
+      label: "Trend",
+      max: 40,
+      result: `${formatCurrency(scan.price)} price / ${formatCurrency(scan.sma50)} 50 SMA / ${formatCurrency(scan.sma200)} 200 SMA`,
+      value: scan.scoreBreakdown.trend,
+      valueText: `${scan.scoreBreakdown.trend}/40 trend`,
+    },
+    {
+      description: "Momentum rewards stable RSI. The model likes strength that is not washed out or stretched too far.",
+      formula: "RSI 45-65 = 25 pts; RSI 35-45 or 65-75 = 15 pts; RSI below 35 = 10 pts; RSI above 75 = 5 pts",
+      label: "Momentum",
+      max: 25,
+      result: `RSI 14 is ${scan.rsi14.toFixed(1)}`,
+      value: scan.scoreBreakdown.momentum,
+      valueText: `${scan.rsi14.toFixed(1)} RSI`,
+    },
+    {
+      description: "Support setup estimates where price sits between recent 20-day support and resistance. The model prefers setups with nearby support and room before resistance.",
+      formula: "Position = (price - 20-day support) / (20-day resistance - 20-day support). Best zone is 12%-45% of the range.",
+      label: "Support",
+      max: 20,
+      result: `${formatPercent(supportPosition)} through the 20-day range`,
+      value: scan.scoreBreakdown.support,
+      valueText: `${formatPercent(supportPosition)} range`,
+    },
+    {
+      description: "MACD rewards positive short-term trend confirmation from the MACD line and histogram.",
+      formula: "MACD = 10 pts if MACD > signal + 5 pts if histogram > 0",
+      label: "MACD",
+      max: 15,
+      result: `MACD ${scan.macd.toFixed(2)} / signal ${scan.macdSignal.toFixed(2)} / histogram ${scan.macdHistogram.toFixed(2)}`,
+      value: scan.scoreBreakdown.macd,
+      valueText: scan.macdHistogram > 0 ? "positive hist" : "cooling hist",
+    },
+  ];
 }
 
 // RecentScansPanel shows the automatic local scan history.

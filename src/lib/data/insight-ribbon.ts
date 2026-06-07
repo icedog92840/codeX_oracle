@@ -19,6 +19,14 @@ export type InsightRoutePayload = {
   briefings: string[];
 };
 
+// InsightDataStatusItem explains one source or assumption behind the displayed app data.
+export type InsightDataStatusItem = {
+  label: string;
+  value: string;
+  detail: string;
+  tone?: "accent" | "positive" | "neutral" | "warning";
+};
+
 // InsightRibbonData stores every route's ribbon content plus shared investing principles.
 export type InsightRibbonData = {
   dashboard: InsightRoutePayload;
@@ -27,6 +35,7 @@ export type InsightRibbonData = {
   drip: InsightRoutePayload;
   analyzer: InsightRoutePayload;
   principles: string[];
+  dataStatus: InsightDataStatusItem[];
 };
 
 // getInsightRibbonData reads the local CSV once and builds compact route-aware briefing data.
@@ -118,6 +127,32 @@ export function getInsightRibbonData(): InsightRibbonData {
       "A durable portfolio is easier to hold when the data is clear and the assumptions are visible.",
       "Compounding favors patience, but only when the underlying position still deserves patience.",
       "Cash flow is not just income; it is optionality that arrives on a schedule.",
+    ],
+    dataStatus: [
+      {
+        label: "Portfolio Ledger",
+        value: `${transactions.length.toLocaleString()} CSV rows`,
+        detail: `Holdings, dividends, DRIP, transactions, and dashboard metrics are parsed from Transaction_Log.csv. Latest parsed row: ${transactionStats.lastDate}.`,
+        tone: "positive",
+      },
+      {
+        label: "Market Prices",
+        value: marketData.source === "local-placeholder" ? "Local placeholders" : "Live provider",
+        detail: "Current prices use the isolated market-data provider. Today it remains local-only and estimates quotes from the latest known CSV prices.",
+        tone: marketData.source === "local-placeholder" ? "warning" : "positive",
+      },
+      {
+        label: "Dividend Yields",
+        value: marketData.source === "local-placeholder" ? "Estimated locally" : "Live provider",
+        detail: "PADI and yield context use local trailing dividend math until a live forward dividend yield provider is connected.",
+        tone: marketData.source === "local-placeholder" ? "warning" : "positive",
+      },
+      {
+        label: "Analyzer Feed",
+        value: "Mock OHLC",
+        detail: "Analyzer scans use deterministic local 200-day OHLC data with local SMA, RSI, MACD, support, resistance, score, and grade calculations.",
+        tone: "accent",
+      },
     ],
   };
 }

@@ -1,10 +1,11 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { AlertCircle, Bookmark, BookmarkCheck, Loader2, RotateCcw, Search, Trash2 } from "lucide-react";
+import { AlertCircle, Bookmark, BookmarkCheck, Loader2, RotateCcw, Search, Trash2, X } from "lucide-react";
 import { getMockAnalyzerPayload } from "@/lib/analyzer/mock-ohlc-provider";
 import { buildAnalyzerScan } from "@/lib/analyzer/technical-score";
 import type { AnalyzerScan, OhlcCandle, WatchlistItem } from "@/lib/analyzer/types";
+import { cn } from "@/lib/utils";
 
 // LoadingMessages are displayed one at a time while the analyzer simulates the local scan pipeline.
 const loadingMessages = [
@@ -35,7 +36,7 @@ export function StockAnalyzer() {
   useEffect(() => {
     window.queueMicrotask(() => {
       setRecentScans(readStoredArray<AnalyzerScan>(storageKeys.recentScans));
-      setWatchlist(readStoredArray<WatchlistItem>(storageKeys.watchlist));
+      setWatchlist(readStoredWatchlist());
     });
   }, []);
 
@@ -81,6 +82,7 @@ export function StockAnalyzer() {
       await wait(loadingMessages.length * 1200);
       setScan(result);
       setRecentScans((currentScans) => storeRecentScans([result, ...currentScans]));
+      setWatchlist((currentWatchlist) => refreshWatchlistScan(currentWatchlist, result));
     } catch {
       setError("The local analyzer could not generate a mock OHLC payload for that ticker.");
     } finally {
@@ -100,13 +102,20 @@ export function StockAnalyzer() {
         ? currentWatchlist.filter((item) => item.ticker !== scan.ticker)
         : [
             {
-              ticker: scan.ticker,
-              companyName: scan.companyName,
-              addedAt: new Date().toISOString(),
-              latestScanId: scan.id,
+              ...buildWatchlistItemFromScan(scan),
             },
             ...currentWatchlist,
           ];
+
+      window.localStorage.setItem(storageKeys.watchlist, JSON.stringify(nextWatchlist));
+      return nextWatchlist;
+    });
+  }
+
+  // removeWatchlistItem deletes one saved ticker without clearing recent scan history.
+  function removeWatchlistItem(ticker: string) {
+    setWatchlist((currentWatchlist) => {
+      const nextWatchlist = currentWatchlist.filter((item) => item.ticker !== ticker);
 
       window.localStorage.setItem(storageKeys.watchlist, JSON.stringify(nextWatchlist));
       return nextWatchlist;
@@ -153,7 +162,7 @@ export function StockAnalyzer() {
 
       <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_420px]">
         <RecentScansPanel onAnalyze={handleAnalyze} onClear={clearRecentScans} recentScans={recentScans} />
-        <WatchlistPanel onAnalyze={handleAnalyze} watchlist={watchlist} />
+        <WatchlistPanel onAnalyze={handleAnalyze} onRemove={removeWatchlistItem} watchlist={watchlist} />
       </div>
     </div>
   );
@@ -404,36 +413,77 @@ function RecentScansPanel({
 // WatchlistPanel shows manually saved tickers for repeat scans.
 function WatchlistPanel({
   onAnalyze,
+  onRemove,
   watchlist,
 }: {
   onAnalyze: (event?: FormEvent<HTMLFormElement>, tickerOverride?: string) => void;
+  onRemove: (ticker: string) => void;
   watchlist: WatchlistItem[];
 }) {
   return (
     <section className="rounded-xl border bg-card/90 p-3 shadow-[0_18px_45px_rgba(0,0,0,0.20)]">
-      <h3 className="text-base font-semibold">Watchlist</h3>
-      <p className="text-xs text-muted-foreground">Saved locally in this browser</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-base font-semibold">Watchlist</h3>
+          <p className="text-xs text-muted-foreground">Saved scan snapshots in this browser</p>
+        </div>
+        <span className="rounded-full border bg-[#191929] px-2 py-1 font-mono text-[10px] text-muted-foreground">{watchlist.length} saved</span>
+      </div>
       <div className="mt-3 grid gap-2">
         {watchlist.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Save a scan to start a local watchlist.</p>
+          <p className="text-sm text-muted-foreground">Save a scan to start a local watchlist with score, grade, price, yield, and last scan date.</p>
         ) : (
           watchlist.map((item) => (
-            <button
+            <article
               key={item.ticker}
-              className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-xl border bg-[#191929] px-3 py-2 text-left transition-colors hover:border-primary/60"
-              onClick={() => onAnalyze(undefined, item.ticker)}
-              type="button"
+              className="rounded-xl border bg-[#191929] p-3 transition-colors hover:border-primary/50"
             >
-              <span className="min-w-0">
-                <span className="block truncate font-mono text-sm font-semibold text-primary">{item.ticker}</span>
-                <span className="block truncate text-xs text-muted-foreground">{item.companyName}</span>
-              </span>
-              <RotateCcw className="size-4 text-muted-foreground" aria-hidden="true" />
-            </button>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate font-mono text-sm font-semibold text-primary">{item.ticker}</p>
+                  <p className="truncate text-xs text-muted-foreground">{item.companyName}</p>
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  <button
+                    className="rounded-xl border p-2 text-muted-foreground transition-colors hover:border-primary/60 hover:text-foreground"
+                    onClick={() => onAnalyze(undefined, item.ticker)}
+                    type="button"
+                    aria-label={`Re-scan ${item.ticker}`}
+                  >
+                    <RotateCcw className="size-3.5" aria-hidden="true" />
+                  </button>
+                  <button
+                    className="rounded-xl border p-2 text-muted-foreground transition-colors hover:border-rose-400/60 hover:text-rose-200"
+                    onClick={() => onRemove(item.ticker)}
+                    type="button"
+                    aria-label={`Remove ${item.ticker} from watchlist`}
+                  >
+                    <X className="size-3.5" aria-hidden="true" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                <WatchlistMetric label="Grade" value={`${item.grade} / ${item.score}`} accent />
+                <WatchlistMetric label="Price" value={formatCurrency(item.price)} />
+                <WatchlistMetric label="Yield" value={formatPercent(item.dividendYield)} />
+                <WatchlistMetric label="Scanned" value={formatShortDate(item.lastScannedAt)} />
+              </div>
+            </article>
           ))
         )}
       </div>
     </section>
+  );
+}
+
+// WatchlistMetric renders one compact saved-scan field inside a watchlist card.
+function WatchlistMetric({ accent = false, label, value }: { accent?: boolean; label: string; value: string }) {
+  return (
+    <div className="rounded-lg border bg-secondary/40 px-2 py-1.5">
+      <p className="text-[10px] uppercase text-muted-foreground">{label}</p>
+      <p className={cn("mt-1 truncate font-mono text-xs font-semibold", accent ? "text-primary" : "text-foreground")}>{value}</p>
+    </div>
   );
 }
 
@@ -487,6 +537,56 @@ function storeRecentScans(scans: AnalyzerScan[]) {
 
   window.localStorage.setItem(storageKeys.recentScans, JSON.stringify(nextScans));
   return nextScans;
+}
+
+// refreshWatchlistScan updates a saved ticker with the newest scan while leaving unsaved tickers alone.
+function refreshWatchlistScan(watchlist: WatchlistItem[], scan: AnalyzerScan) {
+  if (!watchlist.some((item) => item.ticker === scan.ticker)) {
+    return watchlist;
+  }
+
+  const nextWatchlist = watchlist.map((item) => (item.ticker === scan.ticker ? buildWatchlistItemFromScan(scan, item) : item));
+
+  window.localStorage.setItem(storageKeys.watchlist, JSON.stringify(nextWatchlist));
+  return nextWatchlist;
+}
+
+// buildWatchlistItemFromScan keeps the saved watchlist row small but useful for comparison.
+function buildWatchlistItemFromScan(scan: AnalyzerScan, existingItem?: WatchlistItem): WatchlistItem {
+  return {
+    ticker: scan.ticker,
+    companyName: scan.companyName,
+    addedAt: existingItem?.addedAt ?? new Date().toISOString(),
+    lastScannedAt: scan.scannedAt,
+    latestScanId: scan.id,
+    price: scan.price,
+    dividendYield: scan.dividendYield,
+    score: scan.score,
+    grade: scan.grade,
+    source: scan.source,
+  };
+}
+
+// readStoredWatchlist migrates older saved tickers into the richer watchlist snapshot shape.
+function readStoredWatchlist() {
+  const storedItems = readStoredArray<Partial<WatchlistItem>>(storageKeys.watchlist);
+  const migratedItems = storedItems
+    .filter((item): item is Partial<WatchlistItem> & { ticker: string } => typeof item.ticker === "string" && item.ticker.length > 0)
+    .map((item) => ({
+      ticker: item.ticker,
+      companyName: item.companyName ?? item.ticker,
+      addedAt: item.addedAt ?? new Date().toISOString(),
+      lastScannedAt: item.lastScannedAt ?? item.addedAt ?? new Date().toISOString(),
+      latestScanId: item.latestScanId ?? `${item.ticker}-legacy`,
+      price: typeof item.price === "number" ? item.price : 0,
+      dividendYield: typeof item.dividendYield === "number" ? item.dividendYield : 0,
+      score: typeof item.score === "number" ? item.score : 0,
+      grade: item.grade ?? "F",
+      source: item.source ?? "mock",
+    }));
+
+  window.localStorage.setItem(storageKeys.watchlist, JSON.stringify(migratedItems));
+  return migratedItems;
 }
 
 // readStoredArray safely parses one localStorage array.

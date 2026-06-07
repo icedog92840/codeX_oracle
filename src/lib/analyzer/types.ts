@@ -62,10 +62,16 @@ export type AnalyzerScan = {
   candles: OhlcCandle[];
 };
 
-// WatchlistItem stores the user's locally saved analyzer tickers.
+// WatchlistItem stores the user's locally saved analyzer tickers with the latest scan snapshot.
 export type WatchlistItem = {
   ticker: string;
   companyName: string;
   addedAt: string;
+  lastScannedAt: string;
   latestScanId: string;
+  price: number;
+  dividendYield: number;
+  score: number;
+  grade: AnalyzerScan["grade"];
+  source: AnalyzerScan["source"];
 };

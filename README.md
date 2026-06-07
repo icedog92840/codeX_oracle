@@ -15,12 +15,13 @@ The app is past the original Version 1.0 baseline and is currently tagged at `v1
 - Paged/filterable transaction verification with mobile stacked cards.
 - Local mock-OHLC stock analyzer with technical indicators, scoring, recent scans, and watchlist.
 - Isolated market-data provider resolver for future live stock price and dividend yield APIs.
+- Isolated analyzer-data provider resolver for future live historical OHLC APIs.
 
 ## Data Sources
 
 - `Transaction_Log.csv`: Parsed dynamically on server-rendered routes for holdings, dividends, DRIP, transactions, and dashboard calculations.
 - Market prices/yields: Local placeholders only. The provider interface lives in `src/lib/market-data`.
-- Analyzer OHLC candles: Deterministic local mock data only. No external indicator API is used.
+- Analyzer OHLC candles: Deterministic local mock data only. The provider interface lives in `src/lib/analyzer`. No external indicator API is used.
 
 ## Local Commands
 

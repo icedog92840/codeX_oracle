@@ -15,11 +15,19 @@ export type CompanyProfile = {
   dividendYield: number;
 };
 
+// AnalyzerDataSource names where historical OHLC data came from.
+export type AnalyzerDataSource = "mock" | "live";
+
 // AnalyzerPayload stores the local data provider response for one ticker.
 export type AnalyzerPayload = {
   profile: CompanyProfile;
   candles: OhlcCandle[];
-  source: "mock";
+  source: AnalyzerDataSource;
+};
+
+// AnalyzerDataProvider describes any future provider that can return historical candles.
+export type AnalyzerDataProvider = {
+  getAnalyzerPayload(tickerInput: string): Promise<AnalyzerPayload>;
 };
 
 // MacdResult stores the final MACD values from the local EMA calculation.
@@ -43,7 +51,7 @@ export type AnalyzerScan = {
   ticker: string;
   companyName: string;
   scannedAt: string;
-  source: "mock";
+  source: AnalyzerDataSource;
   price: number;
   dividendYield: number;
   support20: number;

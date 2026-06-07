@@ -1,4 +1,4 @@
-import type { AnalyzerScan, MacdResult, OhlcCandle, ScoreBreakdown } from "@/lib/analyzer/types";
+import type { AnalyzerDataSource, AnalyzerScan, MacdResult, OhlcCandle, ScoreBreakdown } from "@/lib/analyzer/types";
 import { calculateMacd, calculateResistance, calculateRsi, calculateSma, calculateSupport } from "@/lib/analyzer/technical-indicators";
 import { buildTechnicalSummary } from "@/lib/analyzer/technical-summary";
 
@@ -13,7 +13,7 @@ export function buildAnalyzerScan({
   ticker: string;
   companyName: string;
   dividendYield: number;
-  source: "mock";
+  source: AnalyzerDataSource;
   candles: OhlcCandle[];
 }): AnalyzerScan {
   const price = candles.at(-1)?.close ?? 0;

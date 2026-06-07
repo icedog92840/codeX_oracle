@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { analyzerDataSettings } from "@/lib/analyzer/analyzer-data-settings";
 import { buildPortfolioHoldings, buildPortfolioSummary } from "@/lib/calculations/portfolio";
 import { formatCurrency, formatPercent, formatShares } from "@/lib/calculations/format";
 import { getMarketDataProvider } from "@/lib/market-data/market-data-resolver";
@@ -55,6 +56,8 @@ export function getInsightRibbonData(): InsightRibbonData {
   const strongestMonth = getStrongestDividendMonth(latestYearDividends);
   const transactionStats = buildTransactionStats(transactions);
   const dripStats = buildDripStats(transactions);
+  const analyzerModeLabel = analyzerDataSettings.activeSource === "mock" ? "Mock OHLC" : "Live OHLC";
+  const analyzerFeedLabel = analyzerDataSettings.activeSource === "mock" ? "Offline" : analyzerDataSettings.liveProviderName;
 
   return {
     dashboard: {
@@ -111,10 +114,10 @@ export function getInsightRibbonData(): InsightRibbonData {
     },
     analyzer: {
       chips: [
-        { label: "Local Mode", value: "Mock OHLC", tone: "accent" },
+        { label: "Local Mode", value: analyzerModeLabel, tone: "accent" },
         { label: "Indicators", value: "SMA RSI MACD", tone: "neutral" },
         { label: "Storage", value: "Browser", tone: "neutral" },
-        { label: "Feed", value: "Offline", tone: "warning" },
+        { label: "Feed", value: analyzerFeedLabel, tone: analyzerDataSettings.activeSource === "mock" ? "warning" : "positive" },
       ],
       briefings: [
         "Analyzer scans use deterministic mock OHLC data, local indicators, and browser-saved watchlist snapshots.",
@@ -149,9 +152,9 @@ export function getInsightRibbonData(): InsightRibbonData {
       },
       {
         label: "Analyzer Feed",
-        value: "Mock OHLC",
-        detail: "Analyzer scans use deterministic local 200-day OHLC data with local SMA, RSI, MACD, support, resistance, score, and grade calculations.",
-        tone: "accent",
+        value: analyzerModeLabel,
+        detail: `Analyzer scans currently use ${analyzerDataSettings.activeSource === "mock" ? "deterministic local" : "configured live"} ${analyzerDataSettings.candleLookbackDays}-day OHLC data with local SMA, RSI, MACD, support, resistance, score, and grade calculations.`,
+        tone: analyzerDataSettings.activeSource === "mock" ? "accent" : "positive",
       },
     ],
   };

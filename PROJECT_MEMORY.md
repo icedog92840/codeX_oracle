@@ -48,6 +48,8 @@ This file preserves the current project state for future Codex turns if chat con
   - Transparent 0-100 technical scoring, A-F grade, signal chips, score breakdown, and rule-based summary.
   - Browser localStorage recent scans and watchlist.
   - Analyzer added to desktop nav and mobile bottom nav as `Scan`.
+- Analyzer data now resolves through `src/lib/analyzer/analyzer-data-resolver.ts` and `analyzer-data-settings.ts`.
+- The active analyzer provider remains `mock`; selecting `live` intentionally errors until a real historical OHLC provider is connected.
 - Market data now resolves through `src/lib/market-data/market-data-resolver.ts` and `market-data-settings.ts`.
 - The active provider remains `local-placeholder`; selecting `live` intentionally errors until a real provider is connected.
 - Mobile dividend payout chart tooltip overflow was fixed by making first/last bar popovers align inward.
@@ -62,8 +64,8 @@ This file preserves the current project state for future Codex turns if chat con
 ## Current Next Steps
 
 1. Keep the app local-first while preparing clean extension points for future live data.
-2. Consider adding a user-visible data status/settings panel that explains CSV-derived data, placeholder prices/yields, and mock analyzer data.
-3. Analyzer can later swap the mock OHLC provider for a live historical OHLC provider.
+2. Consider adding a dedicated settings/data page for provider choices and assumptions if the top-ribbon Data popout becomes too compact.
+3. Live providers can later be implemented behind the market-data and analyzer-data resolver interfaces.
 4. Watchlist/recent scans can later move from browser localStorage to file/SQLite storage if persistence needs to survive browser clearing.
 
 ## Verification Commands

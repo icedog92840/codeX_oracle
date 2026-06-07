@@ -1,4 +1,4 @@
-import type { AnalyzerPayload, CompanyProfile, OhlcCandle } from "@/lib/analyzer/types";
+import type { AnalyzerDataProvider, AnalyzerPayload, CompanyProfile, OhlcCandle } from "@/lib/analyzer/types";
 
 // KnownProfiles gives common tickers friendly names while unknown symbols still work.
 const knownProfiles: Record<string, Omit<CompanyProfile, "ticker">> = {
@@ -28,6 +28,11 @@ export async function getMockAnalyzerPayload(tickerInput: string): Promise<Analy
     source: "mock",
   };
 }
+
+// mockAnalyzerDataProvider exposes mock OHLC generation through the shared provider interface.
+export const mockAnalyzerDataProvider: AnalyzerDataProvider = {
+  getAnalyzerPayload: getMockAnalyzerPayload,
+};
 
 // normalizeTicker keeps user input safe and consistent for mock generation.
 function normalizeTicker(tickerInput: string) {

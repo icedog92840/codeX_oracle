@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AlertCircle, Bookmark, BookmarkCheck, Loader2, RotateCcw, Search, Trash2, X } from "lucide-react";
-import { getMockAnalyzerPayload } from "@/lib/analyzer/mock-ohlc-provider";
+import { getAnalyzerDataProvider } from "@/lib/analyzer/analyzer-data-resolver";
 import { buildAnalyzerScan } from "@/lib/analyzer/technical-score";
 import type { AnalyzerScan, OhlcCandle, WatchlistItem } from "@/lib/analyzer/types";
 import { cn } from "@/lib/utils";
@@ -70,7 +70,7 @@ export function StockAnalyzer() {
     setIsLoading(true);
 
     try {
-      const payload = await getMockAnalyzerPayload(ticker);
+      const payload = await getAnalyzerDataProvider().getAnalyzerPayload(ticker);
       const result = buildAnalyzerScan({
         ticker: payload.profile.ticker,
         companyName: payload.profile.companyName,
@@ -84,7 +84,7 @@ export function StockAnalyzer() {
       setRecentScans((currentScans) => storeRecentScans([result, ...currentScans]));
       setWatchlist((currentWatchlist) => refreshWatchlistScan(currentWatchlist, result));
     } catch {
-      setError("The local analyzer could not generate a mock OHLC payload for that ticker.");
+      setError("The analyzer data provider could not return an OHLC payload for that ticker.");
     } finally {
       setIsLoading(false);
     }

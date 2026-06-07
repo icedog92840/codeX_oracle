@@ -8,6 +8,7 @@ This file preserves the current project state for future Codex turns if chat con
 - Local CSV source: `Transaction_Log.csv` in the project root.
 - The app dynamically parses the local Robinhood CSV on server-rendered routes.
 - Dark fintech theme is based on the uploaded dashboard image.
+- Current pushed checkpoint: `v1.2-market-provider-qa`.
 - Important routes:
   - `/` dashboard
   - `/dividends` dividend tracker
@@ -47,14 +48,23 @@ This file preserves the current project state for future Codex turns if chat con
   - Transparent 0-100 technical scoring, A-F grade, signal chips, score breakdown, and rule-based summary.
   - Browser localStorage recent scans and watchlist.
   - Analyzer added to desktop nav and mobile bottom nav as `Scan`.
-- Current state is ready to discuss as a Version 1.0 candidate after user review.
+- Market data now resolves through `src/lib/market-data/market-data-resolver.ts` and `market-data-settings.ts`.
+- The active provider remains `local-placeholder`; selecting `live` intentionally errors until a real provider is connected.
+- Mobile dividend payout chart tooltip overflow was fixed by making first/last bar popovers align inward.
+
+## Stable Reference Tags
+
+- `v1.0`: Original fully functional local portfolio tracker baseline.
+- `v1.1-ui-polish`: UI polish and analyzer-era refinements.
+- `v1.1.1-data-fix`: Robinhood `BCXL` correction-row handling.
+- `v1.2-market-provider-qa`: Market-data resolver prep plus mobile dividend QA cleanup.
 
 ## Current Next Steps
 
-1. User review of the Version 1.0 candidate screenshots and live app.
-2. If approved, explicitly designate this baseline as Version 1.0 and commit/tag it.
-3. Future work can plug a live provider into `MarketDataProvider` without changing dashboard UI components.
-4. Analyzer can later swap `mockAnalyzerDataProvider` for a live historical OHLC provider and upgrade localStorage to SQLite/file storage.
+1. Keep the app local-first while preparing clean extension points for future live data.
+2. Consider adding a user-visible data status/settings panel that explains CSV-derived data, placeholder prices/yields, and mock analyzer data.
+3. Analyzer can later swap the mock OHLC provider for a live historical OHLC provider.
+4. Watchlist/recent scans can later move from browser localStorage to file/SQLite storage if persistence needs to survive browser clearing.
 
 ## Verification Commands
 
@@ -67,3 +77,4 @@ This file preserves the current project state for future Codex turns if chat con
 - Desktop and mobile screenshots were captured under `C:\Users\Storm\Documents\Codex\2026-06-05\i-want-you-to-create-a\qa-screenshots`.
 - Browser smoke scan covered `/`, `/dividends`, `/dividends?trend=annual`, `/drip`, and `/transactions`.
 - Smoke scan found no app error text, no `NaN`, no `Infinity`, and no desktop horizontal overflow.
+- Later screenshot capture began timing out in the in-app browser, so prefer DOM route scans, overflow checks, typecheck, lint, and build unless a screenshot is specifically needed.

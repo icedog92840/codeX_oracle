@@ -1,10 +1,10 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { AlertCircle, Bookmark, BookmarkCheck, ExternalLink, Loader2, Newspaper, RotateCcw, Search, Trash2, X } from "lucide-react";
+import { AlertCircle, Bookmark, BookmarkCheck, ExternalLink, Info, Loader2, Newspaper, RotateCcw, Search, Trash2, X } from "lucide-react";
 import { getAnalyzerDataProvider } from "@/lib/analyzer/analyzer-data-resolver";
 import { buildAnalyzerScan } from "@/lib/analyzer/technical-score";
-import type { AnalyzerScan, OhlcCandle, WatchlistItem } from "@/lib/analyzer/types";
+import type { AnalyzerScan, OhlcCandle, ValueMetric, ValueScore, WatchlistItem } from "@/lib/analyzer/types";
 import { cn } from "@/lib/utils";
 
 // LoadingMessages are displayed one at a time while the analyzer simulates the local scan pipeline.
@@ -37,6 +37,7 @@ type SnapshotScan = {
     sma50?: number;
     sma200?: number;
     support20?: number;
+    valueScorecard?: AnalyzerScan["valueScorecard"];
   };
   price: number;
   score: number;
@@ -349,6 +350,7 @@ function ResultPanel({
       </div>
 
       <MetricGrid scan={scan} />
+      <ValueScorecardPanel scan={scan} />
       <ScoreBreakdown scan={scan} />
     </div>
   );
@@ -379,6 +381,85 @@ function MetricGrid({ scan }: { scan: AnalyzerScan }) {
         </div>
       ))}
     </section>
+  );
+}
+
+// ValueScorecardPanel renders Graham/Buffett owner-oriented grades alongside technical timing.
+function ValueScorecardPanel({ scan }: { scan: AnalyzerScan }) {
+  const scorecard = scan.valueScorecard;
+
+  return (
+    <section className="rounded-xl border bg-card/90 p-3 shadow-[0_18px_45px_rgba(0,0,0,0.20)]">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <h3 className="text-base font-semibold">Owner Grade</h3>
+          <p className="mt-1 text-xs text-muted-foreground">Graham defensive value plus Buffett business quality, with technical timing kept as a small final weight.</p>
+        </div>
+        <div className="rounded-xl border bg-[#191929] px-4 py-3 text-right">
+          <p className="text-xs uppercase text-muted-foreground">Combined</p>
+          <p className="mt-1 font-mono text-3xl font-semibold text-primary">{scorecard.ownerGrade}</p>
+          <p className="font-mono text-xs text-muted-foreground">{scorecard.ownerScore}/100</p>
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-3 xl:grid-cols-2">
+        <ValueScorePanel score={scorecard.graham} />
+        <ValueScorePanel score={scorecard.buffett} />
+      </div>
+
+      <div className="mt-3 rounded-xl border bg-[#191929] p-3 text-xs leading-5 text-muted-foreground">
+        Owner Grade formula: Graham score is weighted 42%, Buffett score is weighted 48%, and technical timing contributes 10%. Technical timing currently adds {scorecard.technicalTimingWeight} points.
+      </div>
+    </section>
+  );
+}
+
+// ValueScorePanel renders one Graham or Buffett scorecard with explainable metric popouts.
+function ValueScorePanel({ score }: { score: ValueScore }) {
+  return (
+    <section className="rounded-xl border bg-[#191929] p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h4 className="truncate text-sm font-semibold">{score.label}</h4>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">{score.summary}</p>
+        </div>
+        <div className="shrink-0 text-right">
+          <p className="font-mono text-2xl font-semibold text-primary">{score.grade}</p>
+          <p className="font-mono text-xs text-muted-foreground">{score.score}/100</p>
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-2">
+        {score.metrics.map((metric) => (
+          <ValueMetricRow key={metric.label} metric={metric} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// ValueMetricRow renders one scored metric with a hover/focus explanation popout.
+function ValueMetricRow({ metric }: { metric: ValueMetric }) {
+  return (
+    <div className="group/metric relative grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 rounded-lg border bg-secondary/35 px-2 py-2">
+      <div className="min-w-0">
+        <p className="truncate text-xs font-medium text-foreground">{metric.label}</p>
+        <p className="truncate font-mono text-[11px] text-muted-foreground">{metric.value}</p>
+      </div>
+      <p className="font-mono text-xs font-semibold text-primary">{metric.points}/{metric.maxPoints}</p>
+      <button
+        className="rounded-full p-1 text-muted-foreground outline-none transition-colors hover:text-primary focus-visible:text-primary"
+        type="button"
+        aria-label={`${metric.label} explanation`}
+      >
+        <Info className="size-3.5" aria-hidden="true" />
+      </button>
+      <div className="pointer-events-none absolute right-0 top-[calc(100%+8px)] z-40 w-72 rounded-xl border bg-[#24243a] p-3 text-xs opacity-0 shadow-[0_18px_45px_rgba(0,0,0,0.38)] ring-1 ring-primary/10 transition-opacity group-hover/metric:opacity-100 group-focus-within/metric:opacity-100">
+        <p className="font-semibold text-foreground">{metric.label}</p>
+        <p className="mt-2 leading-5 text-muted-foreground">{metric.description}</p>
+        <p className="mt-2 rounded-lg border bg-[#191929] p-2 font-mono text-[11px] leading-5 text-primary">{metric.formula}</p>
+      </div>
+    </div>
   );
 }
 
@@ -658,6 +739,9 @@ function SnapshotDrawer({
               <section className="grid gap-2 sm:grid-cols-2">
                 <SnapshotMetric label="Price" value={formatCurrency(latestScan.price)} />
                 <SnapshotMetric label="Dividend Yield" value={formatPercent(latestScan.dividendYield)} />
+                <SnapshotMetric label="Owner Grade" value={latestScan.metrics.valueScorecard ? `${latestScan.metrics.valueScorecard.ownerGrade} / ${latestScan.metrics.valueScorecard.ownerScore}` : "-"} />
+                <SnapshotMetric label="Graham" value={latestScan.metrics.valueScorecard ? `${latestScan.metrics.valueScorecard.graham.grade} / ${latestScan.metrics.valueScorecard.graham.score}` : "-"} />
+                <SnapshotMetric label="Buffett" value={latestScan.metrics.valueScorecard ? `${latestScan.metrics.valueScorecard.buffett.grade} / ${latestScan.metrics.valueScorecard.buffett.score}` : "-"} />
                 <SnapshotMetric label="RSI 14" value={formatMaybeNumber(latestScan.metrics.rsi14, 1)} />
                 <SnapshotMetric label="MACD" value={formatMaybeNumber(latestScan.metrics.macd, 2)} />
                 <SnapshotMetric label="Support" value={formatMaybeCurrency(latestScan.metrics.support20)} />

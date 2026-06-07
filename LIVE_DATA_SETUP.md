@@ -85,11 +85,11 @@ Analyzer scans and watchlist add/remove actions are mirrored through:
 
 ## Analyzer Direction
 
-The future improved analyzer should combine:
+The analyzer currently combines:
 
 - Graham Defensive Grade
 - Buffett Quality Grade
 - Technical Timing Grade
 - News/filing context
 
-Technical indicators should become a timing layer, not the main score.
+The Graham/Buffett inputs are deterministic local estimates until SEC/FMP fundamentals are wired into the scan payload. Technical indicators are kept as a small timing layer, not the main owner-grade score.

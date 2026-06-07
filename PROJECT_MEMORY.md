@@ -46,6 +46,8 @@ This file preserves the current project state for future Codex turns if chat con
   - Deterministic mock OHLC provider for 200 daily candles.
   - Local SMA, support/resistance, RSI, and MACD calculations.
   - Transparent 0-100 technical scoring, A-F grade, signal chips, score breakdown, and rule-based summary.
+  - Graham Defensive, Buffett Quality, and combined Owner Grade scorecards with metric popout explanations.
+  - Value score fundamentals are deterministic local estimates until SEC fundamentals are wired into scan payloads.
   - Browser localStorage recent scans and watchlist, mirrored into SQLite for durability.
   - Watchlist ticker clicks open a saved scan snapshot drawer backed by SQLite.
   - Analyzer added to desktop nav and mobile bottom nav as `Scan`.
@@ -76,7 +78,7 @@ This file preserves the current project state for future Codex turns if chat con
 1. Keep the app local-first while preparing clean extension points for future live data.
 2. Add a dedicated settings/data page for provider choices, cache status, and assumptions if the top-ribbon Data popout becomes too compact.
 3. Wire analyzer UI to `/api/research/[ticker]` only after API keys/env are configured and the fallback behavior is reviewed.
-4. Add Graham/Buffett value scoring alongside the existing technical timing score.
+4. Replace local estimated value-score inputs with SEC/FMP fundamentals when provider data is configured.
 
 ## Verification Commands
 

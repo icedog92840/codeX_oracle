@@ -45,6 +45,34 @@ export type ScoreBreakdown = {
   macd: number;
 };
 
+// ValueMetric stores one Graham/Buffett metric with scoring and plain-English explanation text.
+export type ValueMetric = {
+  description: string;
+  formula: string;
+  label: string;
+  maxPoints: number;
+  points: number;
+  value: string;
+};
+
+// ValueScore stores one value-investor scorecard.
+export type ValueScore = {
+  grade: "A" | "B" | "C" | "D" | "F";
+  label: string;
+  metrics: ValueMetric[];
+  score: number;
+  summary: string;
+};
+
+// ValueScorecard stores Graham, Buffett, and combined owner-oriented scores.
+export type ValueScorecard = {
+  buffett: ValueScore;
+  graham: ValueScore;
+  ownerGrade: "A" | "B" | "C" | "D" | "F";
+  ownerScore: number;
+  technicalTimingWeight: number;
+};
+
 // AnalyzerScan stores a complete analyzed result that can be saved locally.
 export type AnalyzerScan = {
   id: string;
@@ -64,6 +92,7 @@ export type AnalyzerScan = {
   sma200: number;
   score: number;
   grade: "A" | "B" | "C" | "D" | "F";
+  valueScorecard: ValueScorecard;
   summary: string;
   signals: string[];
   scoreBreakdown: ScoreBreakdown;

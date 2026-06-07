@@ -35,6 +35,7 @@ export function saveAnalyzerScanSnapshot({
         sma50: scan.sma50,
         sma200: scan.sma200,
         support20: scan.support20,
+        valueScorecard: scan.valueScorecard,
       }),
       newsJson: news ? JSON.stringify(news) : null,
       price: scan.price,

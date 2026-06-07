@@ -274,6 +274,7 @@ function DividendMobileCard({ row, openUp }: { row: DividendAssetRow; openUp: bo
         <MobileStat label="DRIP Shares" value={row.dripShares} />
         <MobileStat label="Avg Cost" value={row.standardAverageCost} />
         <MobileStat label="Highest Payout" value={row.highestPayout} />
+        <MobileStat label="Weekly Avg" value={formatFullCurrency(row.total / 52)} />
       </div>
       <div className="mt-3 grid grid-cols-3 gap-1.5">
         {paidMonths.slice(0, 6).map((month) => (

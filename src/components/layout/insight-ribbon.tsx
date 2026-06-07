@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
 import { BarChart3, ChevronRight, Database, Pause, Sparkles, X } from "lucide-react";
-import type { InsightChip, InsightDataStatusItem, InsightRibbonData, InsightRoutePayload } from "@/lib/data/insight-ribbon";
+import type { InsightChip, InsightDataStatusItem, InsightProviderStatus, InsightRibbonData, InsightRoutePayload } from "@/lib/data/insight-ribbon";
 import { cn } from "@/lib/utils";
 
 // InsightRibbon replaces the old search placeholder with page-aware local portfolio context.
@@ -134,17 +134,17 @@ export function InsightRibbon({ data }: { data: InsightRibbonData }) {
       ) : null}
 
       {isDataOpen ? (
-        <DataStatusPanel items={data.dataStatus} onClose={() => setIsDataOpen(false)} />
+        <DataStatusPanel items={data.dataStatus} onClose={() => setIsDataOpen(false)} providers={data.providerStatus} />
       ) : null}
       <div className="insight-hairline absolute inset-x-0 bottom-0 h-px" />
     </section>
   );
 }
 
-// DataStatusPanel explains which app values are CSV-backed, placeholder-backed, or mock-backed.
-function DataStatusPanel({ items, onClose }: { items: InsightDataStatusItem[]; onClose: () => void }) {
+// DataStatusPanel explains which app values are CSV-backed, placeholder-backed, or provider-backed.
+function DataStatusPanel({ items, onClose, providers }: { items: InsightDataStatusItem[]; onClose: () => void; providers: InsightProviderStatus[] }) {
   return (
-    <div className="absolute inset-x-0 top-0 z-40 rounded-2xl border bg-[#191929]/98 p-3 shadow-[0_22px_60px_rgba(0,0,0,0.48)] ring-1 ring-primary/15 backdrop-blur">
+    <div className="pill-scrollbar absolute inset-x-0 top-0 z-40 max-h-[min(78vh,680px)] overflow-y-auto rounded-2xl border bg-[#191929]/98 p-3 shadow-[0_22px_60px_rgba(0,0,0,0.48)] ring-1 ring-primary/15 backdrop-blur">
       <div className="flex items-start gap-3">
         <div className="soft-pulse mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl border bg-secondary text-primary">
           <Database className="size-4" aria-hidden="true" />
@@ -156,6 +156,20 @@ function DataStatusPanel({ items, onClose }: { items: InsightDataStatusItem[]; o
               <DataStatusCard key={item.label} item={item} />
             ))}
           </div>
+          <div className="mt-3 border-t pt-3">
+            <div className="flex flex-wrap items-end justify-between gap-2">
+              <div>
+                <p className="text-xs font-semibold uppercase text-primary">Data Providers</p>
+                <p className="mt-1 text-xs text-muted-foreground">Local env readiness, SQLite cache, and free-tier request guards.</p>
+              </div>
+              <span className="rounded-full border bg-[#202034]/75 px-2 py-1 font-mono text-[10px] text-muted-foreground">offline-safe by default</span>
+            </div>
+            <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+              {providers.map((provider) => (
+                <ProviderStatusCard key={provider.provider} provider={provider} />
+              ))}
+            </div>
+          </div>
         </div>
         <button
           className="shrink-0 rounded-xl border p-2 text-muted-foreground transition-colors hover:border-primary/60 hover:text-foreground"
@@ -166,6 +180,50 @@ function DataStatusPanel({ items, onClose }: { items: InsightDataStatusItem[]; o
           <X className="size-4" aria-hidden="true" />
         </button>
       </div>
+    </div>
+  );
+}
+
+// ProviderStatusCard renders one optional API/feed status without exposing any secret values.
+function ProviderStatusCard({ provider }: { provider: InsightProviderStatus }) {
+  return (
+    <div className="rounded-xl border bg-[#202034]/75 p-3">
+      <div className="flex min-w-0 items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="truncate text-xs font-semibold text-foreground">{provider.label}</p>
+          <p className="mt-1 font-mono text-[10px] text-muted-foreground">{provider.provider}</p>
+        </div>
+        <span
+          className={cn(
+            "shrink-0 rounded-full border px-2 py-0.5 font-mono text-[10px]",
+            provider.tone === "accent" && "border-primary/40 text-primary",
+            provider.tone === "positive" && "border-emerald-300/30 text-emerald-300",
+            provider.tone === "warning" && "border-amber-200/30 text-amber-200",
+            provider.tone === "neutral" && "border-border text-muted-foreground",
+          )}
+        >
+          {provider.enabled ? "Ready" : "Missing env"}
+        </span>
+      </div>
+      <p className="mt-2 text-xs leading-5 text-muted-foreground">{provider.detail}</p>
+      <div className="mt-3 grid grid-cols-3 gap-1.5">
+        <ProviderMiniMetric label="Cache" value={String(provider.cacheEntries)} />
+        <ProviderMiniMetric label="Used" value={provider.usage} />
+        <ProviderMiniMetric label="Limit" value={provider.quota} />
+      </div>
+      {!provider.enabled ? (
+        <p className="mt-2 truncate font-mono text-[10px] text-amber-200">{provider.missingEnv.join(", ")}</p>
+      ) : null}
+    </div>
+  );
+}
+
+// ProviderMiniMetric renders a tiny provider counter for dense status cards.
+function ProviderMiniMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 rounded-lg border bg-[#191929]/75 px-2 py-1.5">
+      <p className="truncate text-[9px] uppercase text-muted-foreground">{label}</p>
+      <p className="mt-0.5 truncate font-mono text-[10px] text-foreground">{value}</p>
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { mockAnalyzerDataProvider } from "@/lib/analyzer/mock-ohlc-provider";
+import { researchAnalyzerDataProvider } from "@/lib/analyzer/research-analyzer-provider";
 import { analyzerDataSettings, type AnalyzerDataSettings } from "@/lib/analyzer/analyzer-data-settings";
 import type { AnalyzerDataProvider } from "@/lib/analyzer/types";
 
@@ -8,12 +9,5 @@ export function getAnalyzerDataProvider(settings: AnalyzerDataSettings = analyze
     return mockAnalyzerDataProvider;
   }
 
-  return liveAnalyzerDataProviderPlaceholder;
+  return researchAnalyzerDataProvider;
 }
-
-// liveAnalyzerDataProviderPlaceholder marks the future live-candle extension point without faking live data.
-const liveAnalyzerDataProviderPlaceholder: AnalyzerDataProvider = {
-  getAnalyzerPayload() {
-    throw new Error("Live analyzer OHLC provider is not configured. Set up a live provider before selecting activeSource='live'.");
-  },
-};

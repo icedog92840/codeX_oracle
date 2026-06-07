@@ -1,4 +1,4 @@
-import type { AnalyzerDataSource, AnalyzerScan, MacdResult, OhlcCandle, ScoreBreakdown } from "@/lib/analyzer/types";
+import type { AnalyzerDataSource, AnalyzerFeedStatus, AnalyzerScan, MacdResult, OhlcCandle, ScoreBreakdown } from "@/lib/analyzer/types";
 import { calculateMacd, calculateResistance, calculateRsi, calculateSma, calculateSupport } from "@/lib/analyzer/technical-indicators";
 import { buildTechnicalSummary } from "@/lib/analyzer/technical-summary";
 import { buildValueScorecard } from "@/lib/analyzer/value-score";
@@ -9,6 +9,7 @@ export function buildAnalyzerScan({
   ticker,
   companyName,
   dividendYield,
+  feedStatus,
   fundamentals,
   source,
   candles,
@@ -16,6 +17,7 @@ export function buildAnalyzerScan({
   ticker: string;
   companyName: string;
   dividendYield: number;
+  feedStatus: AnalyzerFeedStatus;
   fundamentals?: FundamentalSnapshot;
   source: AnalyzerDataSource;
   candles: OhlcCandle[];
@@ -40,6 +42,7 @@ export function buildAnalyzerScan({
     companyName,
     scannedAt: new Date().toISOString(),
     source,
+    feedStatus,
     price,
     dividendYield,
     support20,

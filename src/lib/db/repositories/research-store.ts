@@ -26,6 +26,7 @@ export function saveAnalyzerScanSnapshot({
       grade: scan.grade,
       id: scan.id,
       metricsJson: JSON.stringify({
+        feedStatus: scan.feedStatus,
         macd: scan.macd,
         macdHistogram: scan.macdHistogram,
         macdSignal: scan.macdSignal,

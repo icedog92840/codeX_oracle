@@ -1,15 +1,13 @@
-import type { AnalyzerDataSource } from "@/lib/analyzer/types";
-
 // AnalyzerDataSettings stores the active historical-candle provider choice.
 export type AnalyzerDataSettings = {
-  activeSource: AnalyzerDataSource;
+  activeSource: "mock" | "research";
   candleLookbackDays: number;
   liveProviderName: string;
 };
 
-// analyzerDataSettings keeps analyzer scans local until a live OHLC provider is intentionally connected.
+// analyzerDataSettings prefers cached research candles but falls back to mock when providers are missing.
 export const analyzerDataSettings: AnalyzerDataSettings = {
-  activeSource: "mock",
+  activeSource: "research",
   candleLookbackDays: 200,
-  liveProviderName: "not-configured",
+  liveProviderName: "research-cache",
 };

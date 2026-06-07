@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AlertCircle, Bookmark, BookmarkCheck, ExternalLink, Info, Loader2, Newspaper, RotateCcw, Search, Trash2, X } from "lucide-react";
 import { getAnalyzerDataProvider } from "@/lib/analyzer/analyzer-data-resolver";
 import { buildAnalyzerScan } from "@/lib/analyzer/technical-score";
-import type { AnalyzerScan, OhlcCandle, ValueMetric, ValueScore, WatchlistItem } from "@/lib/analyzer/types";
+import type { AnalyzerFeedStatus, AnalyzerScan, OhlcCandle, ValueMetric, ValueScore, WatchlistItem } from "@/lib/analyzer/types";
 import type { FundamentalSnapshot, SourceFreshness, StockResearchSnapshot } from "@/lib/external-data/types";
 import { cn } from "@/lib/utils";
 
@@ -32,6 +32,7 @@ type SnapshotScan = {
   grade: string;
   id: string;
   metrics: {
+    feedStatus?: AnalyzerFeedStatus;
     macd?: number;
     resistance20?: number;
     rsi14?: number;
@@ -129,6 +130,7 @@ export function StockAnalyzer() {
         ticker: payload.profile.ticker,
         companyName: payload.profile.companyName,
         dividendYield: payload.profile.dividendYield,
+        feedStatus: payload.feedStatus,
         fundamentals: researchSnapshot?.fundamentals,
         source: payload.source,
         candles: payload.candles,
@@ -282,7 +284,7 @@ export function StockAnalyzer() {
             Analyze
           </button>
         </form>
-        <p className="mt-2 text-xs text-muted-foreground">Mock OHLC data only. No live market feed is connected yet.</p>
+        <p className="mt-2 text-xs text-muted-foreground">Uses cached provider OHLC when configured; otherwise falls back to deterministic mock candles.</p>
       </section>
 
       {error ? <ErrorPanel message={error} /> : null}
@@ -363,7 +365,7 @@ function ResultPanel({
               <h2 className="truncate text-xl font-semibold">{scan.companyName}</h2>
               <p className="font-mono text-sm text-primary">{scan.ticker}</p>
             </div>
-            <span className="rounded-xl border bg-[#191929] px-3 py-1.5 font-mono text-xs text-muted-foreground">Mock OHLC</span>
+            <FeedStatusBadge feedStatus={scan.feedStatus} />
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
             {scan.signals.map((signal) => (
@@ -495,6 +497,21 @@ function DataConfidenceBadge({ confidence }: { confidence: AnalyzerScan["valueSc
         </span>
       </span>
     </span>
+  );
+}
+
+// FeedStatusBadge explains whether analyzer candles came from mock fallback or cached provider research.
+function FeedStatusBadge({ feedStatus }: { feedStatus: AnalyzerFeedStatus }) {
+  const isProvider = feedStatus.source === "provider";
+
+  return (
+    <div className={cn(
+      "rounded-xl border bg-[#191929] px-3 py-1.5 text-right",
+      isProvider ? "border-emerald-300/30" : "border-amber-200/30",
+    )}>
+      <p className={cn("font-mono text-xs font-semibold", isProvider ? "text-emerald-300" : "text-amber-200")}>{feedStatus.label}</p>
+      <p className="mt-0.5 max-w-52 truncate text-[10px] text-muted-foreground">{feedStatus.provider ? formatSourceLabel(feedStatus.provider) : "Local fallback"}</p>
+    </div>
   );
 }
 
@@ -819,7 +836,7 @@ function SnapshotDrawer({
                     <h4 className="truncate text-lg font-semibold">{latestScan.companyName}</h4>
                     <p className="font-mono text-xs text-muted-foreground">Saved {formatShortDate(latestScan.createdAt)} / {latestScan.source}</p>
                     <div className="mt-2 flex flex-wrap gap-1.5">
-                      <SourceTag label={latestScan.source === "mock" ? "Mock OHLC" : "Live OHLC"} tone={latestScan.source === "mock" ? "warning" : "positive"} />
+                      <SourceTag label={getSnapshotFeedStatus(latestScan).label} tone={getSnapshotFeedStatus(latestScan).source === "mock" ? "warning" : "positive"} />
                       {latestScorecard?.dataConfidence.provider ? <SourceTag label={latestScorecard.dataConfidence.provider} tone="positive" /> : <SourceTag label="Estimated Value" tone="warning" />}
                       {research?.quote ? <SourceTag label={research.quote.source} tone="positive" /> : null}
                       {research?.news.length ? <SourceTag label="News cached" tone="accent" /> : null}
@@ -1045,6 +1062,15 @@ function getValueDataConfidence(scorecard: AnalyzerScan["valueScorecard"]): Anal
     level: "estimated",
     providerFields: 0,
     totalFields: 10,
+  };
+}
+
+// getSnapshotFeedStatus keeps older saved scans readable if they predate feed-status tracking.
+function getSnapshotFeedStatus(scan: SnapshotScan): AnalyzerFeedStatus {
+  return scan.metrics.feedStatus ?? {
+    detail: "This saved scan predates analyzer feed tracking. Re-run the scan to see provider versus mock status.",
+    label: scan.source === "mock" ? "Mock OHLC" : "Live OHLC",
+    source: scan.source === "mock" ? "mock" : "provider",
   };
 }
 

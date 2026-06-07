@@ -18,10 +18,24 @@ export type CompanyProfile = {
 // AnalyzerDataSource names where historical OHLC data came from.
 export type AnalyzerDataSource = "mock" | "live";
 
+// AnalyzerFeedStatus explains whether a scan used mock fallback or provider-backed research data.
+export type AnalyzerFeedStatus = {
+  detail: string;
+  freshness?: {
+    expiresAt: string;
+    fetchedAt: string;
+    isStale: boolean;
+  };
+  label: string;
+  provider?: string;
+  source: "mock" | "provider";
+};
+
 // AnalyzerPayload stores the local data provider response for one ticker.
 export type AnalyzerPayload = {
   profile: CompanyProfile;
   candles: OhlcCandle[];
+  feedStatus: AnalyzerFeedStatus;
   source: AnalyzerDataSource;
 };
 
@@ -92,6 +106,7 @@ export type AnalyzerScan = {
   companyName: string;
   scannedAt: string;
   source: AnalyzerDataSource;
+  feedStatus: AnalyzerFeedStatus;
   price: number;
   dividendYield: number;
   support20: number;

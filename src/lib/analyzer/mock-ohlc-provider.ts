@@ -25,6 +25,11 @@ export async function getMockAnalyzerPayload(tickerInput: string): Promise<Analy
   return {
     profile,
     candles: buildMockCandles(ticker),
+    feedStatus: {
+      detail: "Deterministic local OHLC fallback. Add provider keys to use cached live research candles.",
+      label: "Mock OHLC",
+      source: "mock",
+    },
     source: "mock",
   };
 }

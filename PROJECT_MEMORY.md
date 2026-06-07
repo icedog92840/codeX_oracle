@@ -53,7 +53,7 @@ This file preserves the current project state for future Codex turns if chat con
   - Watchlist ticker clicks open a saved scan snapshot drawer backed by SQLite.
   - Analyzer added to desktop nav and mobile bottom nav as `Scan`.
 - Analyzer data now resolves through `src/lib/analyzer/analyzer-data-resolver.ts` and `analyzer-data-settings.ts`.
-- The active analyzer provider remains `mock`; selecting `live` intentionally errors until a real historical OHLC provider is connected.
+- The active analyzer provider is `research`; it prefers cached `/api/research` OHLC data and falls back to deterministic mock candles when provider keys are missing or provider candles are unusable.
 - Market data now resolves through `src/lib/market-data/market-data-resolver.ts` and `market-data-settings.ts`.
 - The active provider remains `local-placeholder`; selecting `live` intentionally errors until a real provider is connected.
 - External live-data scaffolding now lives under `src/lib/external-data`:

@@ -59,8 +59,8 @@ export function getInsightRibbonData(): InsightRibbonData {
   const strongestMonth = getStrongestDividendMonth(latestYearDividends);
   const transactionStats = buildTransactionStats(transactions);
   const dripStats = buildDripStats(transactions);
-  const analyzerModeLabel = analyzerDataSettings.activeSource === "mock" ? "Mock OHLC" : "Live OHLC";
-  const analyzerFeedLabel = analyzerDataSettings.activeSource === "mock" ? "Offline" : analyzerDataSettings.liveProviderName;
+  const analyzerModeLabel = analyzerDataSettings.activeSource === "mock" ? "Mock OHLC" : "Research-first";
+  const analyzerFeedLabel = analyzerDataSettings.activeSource === "mock" ? "Offline" : "Cached/live";
   const providerStatus = getProviderStatuses();
   const readyProviders = providerStatus.filter((provider) => provider.enabled).length;
   const totalProviderCacheEntries = providerStatus.reduce((total, provider) => total + provider.cacheEntries, 0);
@@ -127,9 +127,9 @@ export function getInsightRibbonData(): InsightRibbonData {
         { label: "Feed", value: analyzerFeedLabel, tone: analyzerDataSettings.activeSource === "mock" ? "warning" : "positive" },
       ],
       briefings: [
-        "Analyzer scans use deterministic mock OHLC data, local indicators, and browser-saved watchlist snapshots.",
+        "Analyzer scans prefer cached provider OHLC data when configured and fall back to deterministic mock candles.",
         "Scores combine trend, RSI momentum, support proximity, and MACD behavior into a transparent grade.",
-        "The market-data provider is isolated so live quotes can be plugged in later without rewriting the UI.",
+        "The analyzer provider is isolated so live quotes and candles can be verified without rewriting the UI.",
       ],
     },
     dataProviders: {
@@ -173,7 +173,7 @@ export function getInsightRibbonData(): InsightRibbonData {
       {
         label: "Analyzer Feed",
         value: analyzerModeLabel,
-        detail: `Analyzer scans currently use ${analyzerDataSettings.activeSource === "mock" ? "deterministic local" : "configured live"} ${analyzerDataSettings.candleLookbackDays}-day OHLC data with local SMA, RSI, MACD, support, resistance, score, and grade calculations.`,
+        detail: `Analyzer scans currently use ${analyzerDataSettings.activeSource === "mock" ? "deterministic local" : "cached provider with mock fallback"} ${analyzerDataSettings.candleLookbackDays}-day OHLC data with local SMA, RSI, MACD, support, resistance, score, and grade calculations.`,
         tone: analyzerDataSettings.activeSource === "mock" ? "accent" : "positive",
       },
     ],

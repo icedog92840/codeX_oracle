@@ -52,6 +52,12 @@ This file preserves the current project state for future Codex turns if chat con
 - The active analyzer provider remains `mock`; selecting `live` intentionally errors until a real historical OHLC provider is connected.
 - Market data now resolves through `src/lib/market-data/market-data-resolver.ts` and `market-data-settings.ts`.
 - The active provider remains `local-placeholder`; selecting `live` intentionally errors until a real provider is connected.
+- External live-data scaffolding now lives under `src/lib/external-data`:
+  - Local file cache in `.data/external-cache`.
+  - API-budget counters in `.data/api-budget`.
+  - Provider adapters for Twelve Data, SEC EDGAR, Alpha Vantage, FMP, and configurable RSS news.
+  - Server route `/api/research/[ticker]` for cached quote/candles/fundamentals/news without exposing API keys.
+  - Setup notes in `LIVE_DATA_SETUP.md`.
 - Mobile dividend payout chart tooltip overflow was fixed by making first/last bar popovers align inward.
 
 ## Stable Reference Tags
@@ -64,8 +70,8 @@ This file preserves the current project state for future Codex turns if chat con
 ## Current Next Steps
 
 1. Keep the app local-first while preparing clean extension points for future live data.
-2. Consider adding a dedicated settings/data page for provider choices and assumptions if the top-ribbon Data popout becomes too compact.
-3. Live providers can later be implemented behind the market-data and analyzer-data resolver interfaces.
+2. Add a dedicated settings/data page for provider choices, cache status, and assumptions if the top-ribbon Data popout becomes too compact.
+3. Wire analyzer UI to `/api/research/[ticker]` only after API keys/env are configured and the fallback behavior is reviewed.
 4. Watchlist/recent scans can later move from browser localStorage to file/SQLite storage if persistence needs to survive browser clearing.
 
 ## Verification Commands

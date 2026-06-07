@@ -1,0 +1,186 @@
+"use client";
+
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { usePathname } from "next/navigation";
+import { BarChart3, ChevronRight, Pause, Sparkles } from "lucide-react";
+import type { InsightChip, InsightRibbonData, InsightRoutePayload } from "@/lib/data/insight-ribbon";
+import { cn } from "@/lib/utils";
+
+// InsightRibbon replaces the old search placeholder with page-aware local portfolio context.
+export function InsightRibbon({ data }: { data: InsightRibbonData }) {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+  const pathname = usePathname();
+  const analyzerStorageSnapshot = useSyncExternalStore(subscribeAnalyzerStorage, getAnalyzerStorageSnapshot, getEmptyAnalyzerStorageSnapshot);
+  const analyzerSnapshot = useMemo(
+    () => (pathname.startsWith("/analyzer") ? readAnalyzerSnapshot(analyzerStorageSnapshot) : null),
+    [analyzerStorageSnapshot, pathname],
+  );
+  const routePayload = useMemo(() => getRoutePayload(pathname, data, analyzerSnapshot), [analyzerSnapshot, data, pathname]);
+  const rotationItems = useMemo(() => buildRotationItems(routePayload, data.principles), [data.principles, routePayload]);
+  const activeItem = rotationItems[activeIndex % rotationItems.length];
+
+  useEffect(() => {
+    if (isPaused) {
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      setActiveIndex((currentIndex) => (currentIndex + 1) % rotationItems.length);
+    }, 8000);
+
+    return () => window.clearInterval(interval);
+  }, [isPaused, rotationItems.length]);
+
+  return (
+    <section
+      className="group relative overflow-hidden rounded-2xl border bg-card/80 shadow-[0_12px_36px_rgba(0,0,0,0.18)] ring-1 ring-primary/5 backdrop-blur"
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
+    >
+      <button
+        className="grid w-full gap-2 p-2 text-left md:grid-cols-[minmax(0,1fr)_minmax(280px,0.72fr)] md:items-center"
+        onClick={() => setActiveIndex((currentIndex) => (currentIndex + 1) % rotationItems.length)}
+        type="button"
+        aria-label="Cycle portfolio insight"
+      >
+        <div className="flex min-w-0 items-center gap-2">
+          <div className="hidden size-9 shrink-0 items-center justify-center rounded-xl border bg-[#191929] text-primary shadow-[0_0_22px_rgba(56,213,255,0.14)] sm:flex">
+            <BarChart3 className="size-4" aria-hidden="true" />
+          </div>
+          <div className="grid min-w-0 flex-1 grid-cols-2 gap-1.5 sm:grid-cols-4">
+            {routePayload.chips.map((chip) => (
+              <InsightChipPill key={`${chip.label}-${chip.value}`} chip={chip} />
+            ))}
+          </div>
+        </div>
+
+        <div className="relative min-w-0 rounded-xl border bg-[#191929]/80 px-3 py-2">
+          <div className="flex min-w-0 items-center gap-2">
+            {activeItem.type === "principle" ? (
+              <Sparkles className="size-3.5 shrink-0 text-accent-foreground" aria-hidden="true" />
+            ) : (
+              <ChevronRight className="size-3.5 shrink-0 text-primary" aria-hidden="true" />
+            )}
+            <p key={`${pathname}-${activeIndex}`} className="insight-slide min-w-0 truncate text-xs text-muted-foreground md:text-sm">
+              <span className="font-medium text-foreground">{activeItem.label}</span>
+              <span className="mx-1.5 text-border">/</span>
+              {activeItem.text}
+            </p>
+            {isPaused ? <Pause className="ml-auto hidden size-3 shrink-0 text-muted-foreground md:block" aria-hidden="true" /> : null}
+          </div>
+        </div>
+      </button>
+      <div className="insight-hairline absolute inset-x-0 bottom-0 h-px" />
+    </section>
+  );
+}
+
+// InsightChipPill renders one compact metric chip in the ribbon.
+function InsightChipPill({ chip }: { chip: InsightChip }) {
+  return (
+    <div className="min-w-0 rounded-xl border bg-[#191929]/70 px-2 py-1.5">
+      <p className="truncate text-[10px] uppercase text-muted-foreground">{chip.label}</p>
+      <p
+        className={cn(
+          "mt-0.5 truncate font-mono text-xs font-semibold",
+          chip.tone === "accent" && "text-primary",
+          chip.tone === "positive" && "text-emerald-300",
+          chip.tone === "warning" && "text-amber-200",
+          (!chip.tone || chip.tone === "neutral") && "text-foreground",
+        )}
+      >
+        {chip.value}
+      </p>
+    </div>
+  );
+}
+
+// getRoutePayload selects the matching route payload from the server-built local data.
+function getRoutePayload(pathname: string, data: InsightRibbonData, analyzerSnapshot: InsightRoutePayload | null) {
+  if (pathname.startsWith("/dividends")) {
+    return data.dividends;
+  }
+
+  if (pathname.startsWith("/transactions")) {
+    return data.transactions;
+  }
+
+  if (pathname.startsWith("/drip")) {
+    return data.drip;
+  }
+
+  if (pathname.startsWith("/analyzer")) {
+    return analyzerSnapshot ?? data.analyzer;
+  }
+
+  return data.dashboard;
+}
+
+// buildRotationItems mixes route-specific briefings with investing principles.
+function buildRotationItems(routePayload: InsightRoutePayload, principles: string[]) {
+  return [
+    ...routePayload.briefings.map((text) => ({ label: "Briefing", text, type: "briefing" as const })),
+    ...principles.map((text) => ({ label: "Principle", text, type: "principle" as const })),
+  ];
+}
+
+// subscribeAnalyzerStorage lets the ribbon react when saved Analyzer data changes in this browser.
+function subscribeAnalyzerStorage(onStoreChange: () => void) {
+  window.addEventListener("storage", onStoreChange);
+
+  return () => window.removeEventListener("storage", onStoreChange);
+}
+
+// getAnalyzerStorageSnapshot reads the two Analyzer localStorage keys as one stable serialized snapshot.
+function getAnalyzerStorageSnapshot() {
+  if (typeof window === "undefined") {
+    return getEmptyAnalyzerStorageSnapshot();
+  }
+
+  return JSON.stringify({
+    recentScans: window.localStorage.getItem("codex-oracle.analyzer.recent-scans") ?? "[]",
+    watchlist: window.localStorage.getItem("codex-oracle.analyzer.watchlist") ?? "[]",
+  });
+}
+
+// getEmptyAnalyzerStorageSnapshot keeps server rendering deterministic before browser storage exists.
+function getEmptyAnalyzerStorageSnapshot() {
+  return JSON.stringify({
+    recentScans: "[]",
+    watchlist: "[]",
+  });
+}
+
+// readAnalyzerSnapshot enriches the Analyzer ribbon from browser-local watchlist storage.
+function readAnalyzerSnapshot(storageSnapshot: string): InsightRoutePayload | null {
+
+  try {
+    const storage = JSON.parse(storageSnapshot) as { recentScans: string; watchlist: string };
+    const watchlist = JSON.parse(storage.watchlist) as Array<{
+      ticker?: string;
+      grade?: string;
+      score?: number;
+      lastScannedAt?: string;
+    }>;
+    const recentScans = JSON.parse(storage.recentScans) as Array<{ ticker?: string; scannedAt?: string }>;
+    const bestSaved = watchlist.slice().sort((left, right) => (right.score ?? 0) - (left.score ?? 0))[0];
+    const lastScan = recentScans[0];
+
+    return {
+      chips: [
+        { label: "Watchlist", value: String(watchlist.length), tone: "accent" },
+        { label: "Best Grade", value: bestSaved ? `${bestSaved.ticker ?? "-"} ${bestSaved.grade ?? "-"}` : "-", tone: "positive" },
+        { label: "Recent", value: lastScan?.ticker ?? "-", tone: "neutral" },
+        { label: "Feed", value: "Offline", tone: "warning" },
+      ],
+      briefings: [
+        bestSaved ? `${bestSaved.ticker} is the strongest saved analyzer scan at ${bestSaved.grade} / ${bestSaved.score}.` : "Save analyzer scans to build a local watchlist with scores and grades.",
+        lastScan ? `The most recent analyzer scan stored in this browser is ${lastScan.ticker}.` : "Recent scans will appear after the first local technical analysis run.",
+        "Analyzer results remain local and use mock OHLC data until a live market-data feed is connected.",
+      ],
+    };
+  } catch {
+    return null;
+  }
+}

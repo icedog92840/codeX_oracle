@@ -118,3 +118,42 @@ a {
   position: sticky;
   right: 0;
 }
+
+.insight-slide {
+  animation: insight-slide 420ms ease-out both;
+}
+
+.insight-hairline {
+  animation: insight-hairline 4.8s ease-in-out infinite;
+  background: linear-gradient(90deg, rgba(56, 213, 255, 0), rgba(56, 213, 255, 0.9), rgba(124, 58, 237, 0.85), rgba(56, 213, 255, 0));
+  background-size: 220% 100%;
+}
+
+@keyframes insight-slide {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes insight-hairline {
+  0% {
+    background-position: 0% 50%;
+    opacity: 0.32;
+  }
+
+  50% {
+    background-position: 100% 50%;
+    opacity: 0.82;
+  }
+
+  100% {
+    background-position: 0% 50%;
+    opacity: 0.32;
+  }
+}

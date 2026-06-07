@@ -145,22 +145,26 @@ export default async function DividendsPage({
       </section>
 
       <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_420px]">
-        <section className="rounded-xl border bg-card/90 p-3 shadow-[0_18px_45px_rgba(0,0,0,0.20)]">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h2 className="text-base font-semibold">{dividendData.trendMode === "annual" ? "Annual Payout Trend" : "Monthly Payout Trend"}</h2>
-              <p className="text-xs text-muted-foreground">
-                {dividendData.trendMode === "annual" ? "Dividend totals by calendar year" : "Selected-range dividend totals by month"}
-              </p>
+        <div className="grid gap-3">
+          <section className="rounded-xl border bg-card/90 p-3 shadow-[0_18px_45px_rgba(0,0,0,0.20)]">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h2 className="text-base font-semibold">{dividendData.trendMode === "annual" ? "Annual Payout Trend" : "Monthly Payout Trend"}</h2>
+                <p className="text-xs text-muted-foreground">
+                  {dividendData.trendMode === "annual" ? "Dividend totals by calendar year" : "Selected-range dividend totals by month"}
+                </p>
+              </div>
+              <TrendModeSwitch dividendData={dividendData} />
             </div>
-            <TrendModeSwitch dividendData={dividendData} />
-          </div>
-          <div className="mt-4 flex h-56 items-stretch gap-2 border-b border-l px-2 pb-2">
-            {trendPoints.map((point) => (
-              <TrendBar key={point.label} point={point} maxTotal={maxTrendTotal} />
-            ))}
-          </div>
-        </section>
+            <div className="mt-4 flex h-56 items-stretch gap-2 border-b border-l px-2 pb-2">
+              {trendPoints.map((point) => (
+                <TrendBar key={point.label} point={point} maxTotal={maxTrendTotal} />
+              ))}
+            </div>
+          </section>
+
+          <DividendProgressionLineChart points={dividendData.months} selectedRangeLabel={dividendData.selectedRangeLabel} />
+        </div>
 
         <section className="overflow-hidden rounded-xl border bg-card/90 shadow-[0_18px_45px_rgba(0,0,0,0.20)]">
           <div className="border-b px-3 py-2">
@@ -180,6 +184,59 @@ export default async function DividendsPage({
         </section>
       </div>
     </div>
+  );
+}
+
+// DividendProgressionLineChart renders a month-over-month line graph for selected-range dividends.
+function DividendProgressionLineChart({ points, selectedRangeLabel }: { points: DividendTrendPoint[]; selectedRangeLabel: string }) {
+  const chart = buildDividendLineGeometry(points);
+
+  return (
+    <section className="rounded-xl border bg-card/90 p-3 shadow-[0_18px_45px_rgba(0,0,0,0.20)]">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold">Dividend Progression</h2>
+          <p className="text-xs text-muted-foreground">Month-over-month dividend cash in {selectedRangeLabel}</p>
+        </div>
+        <span className="rounded-xl bg-accent px-2 py-1 font-mono text-xs text-accent-foreground">Line</span>
+      </div>
+
+      <svg className="h-64 w-full overflow-visible" viewBox="0 0 720 260" role="img" aria-label="Dividend month-over-month progression line chart">
+        <defs>
+          <linearGradient id="dividendProgressionFill" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor="#25e0bf" stopOpacity="0.22" />
+            <stop offset="100%" stopColor="#38d5ff" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {chart.grid.map((line) => (
+          <g key={line.label}>
+            <line x1="58" x2="700" y1={line.y} y2={line.y} stroke="#38384d" strokeDasharray="4 6" />
+            <text x="0" y={line.y + 4} className="fill-muted-foreground font-mono text-[10px]">{line.label}</text>
+          </g>
+        ))}
+        <path d={chart.fillPath} fill="url(#dividendProgressionFill)" />
+        <path d={chart.path} fill="none" stroke="#25e0bf" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
+        {chart.points.map((point, index) => (
+          <g key={`${points[index].label}-${points[index].total}`} className="group/point">
+            <circle cx={point.x} cy={point.y} r="3" className="fill-emerald-300 transition-transform group-hover/point:scale-125" stroke="#171724" strokeWidth="2" />
+            <g className="pointer-events-none opacity-0 transition-opacity group-hover/point:opacity-100">
+              <rect x={Math.min(Math.max(point.x - 44, 62), 612)} y={Math.max(point.y - 48, 4)} width="88" height="36" rx="10" className="fill-[#191929] stroke-border" />
+              <text x={Math.min(Math.max(point.x, 106), 656)} y={Math.max(point.y - 27, 25)} textAnchor="middle" className="fill-foreground font-mono text-[10px]">
+                {points[index].displayTotal}
+              </text>
+              <text x={Math.min(Math.max(point.x, 106), 656)} y={Math.max(point.y - 13, 39)} textAnchor="middle" className="fill-muted-foreground text-[9px]">
+                {points[index].label}
+              </text>
+            </g>
+          </g>
+        ))}
+        {chart.xLabels.map((label) => (
+          <text key={label.label} x={label.x} y="250" textAnchor="middle" className="fill-muted-foreground font-mono text-[10px]">
+            {label.label}
+          </text>
+        ))}
+      </svg>
+    </section>
   );
 }
 
@@ -264,6 +321,46 @@ function TrendBar({ point, maxTotal }: { point: DividendTrendPoint; maxTotal: nu
       <span className="truncate text-center font-mono text-[10px] text-muted-foreground">{point.label}</span>
     </div>
   );
+}
+
+// buildDividendLineGeometry converts monthly dividend totals into SVG chart coordinates.
+function buildDividendLineGeometry(points: DividendTrendPoint[]) {
+  const totals = points.map((point) => point.total);
+  const max = Math.max(...totals, 1);
+  const min = Math.min(...totals, 0);
+  const spread = Math.max(max - min, 1);
+  const left = 58;
+  const right = 700;
+  const top = 22;
+  const bottom = 218;
+  const plottedPoints = points.map((point, index) => ({
+    x: points.length <= 1 ? left : left + (index / (points.length - 1)) * (right - left),
+    y: bottom - ((point.total - min) / spread) * (bottom - top),
+  }));
+  const path = plottedPoints.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`).join(" ");
+  const fillPath = plottedPoints.length > 0
+    ? `${path} L ${plottedPoints.at(-1)?.x.toFixed(2)} ${bottom} L ${left} ${bottom} Z`
+    : "";
+  const xLabelIndexes = Array.from(new Set([0, 2, 5, 8, 11])).filter((index) => index < points.length);
+
+  return {
+    fillPath,
+    path,
+    points: plottedPoints,
+    grid: Array.from({ length: 4 }, (_, index) => {
+      const ratio = index / 3;
+      const value = max - (max - min) * ratio;
+
+      return {
+        y: top + ratio * (bottom - top),
+        label: formatCompactCurrency(value),
+      };
+    }),
+    xLabels: xLabelIndexes.map((index) => ({
+      x: plottedPoints[index]?.x ?? left,
+      label: points[index]?.label ?? "",
+    })),
+  };
 }
 
 // SortableHeader renders a dividend matrix header link with active sort direction.
@@ -498,4 +595,14 @@ function Metric({
       <p className="mt-2 text-xs text-muted-foreground">{detail}</p>
     </section>
   );
+}
+
+// formatCompactCurrency keeps chart axis labels readable in a dense card.
+function formatCompactCurrency(value: number) {
+  return new Intl.NumberFormat("en-US", {
+    currency: "USD",
+    maximumFractionDigits: 1,
+    notation: "compact",
+    style: "currency",
+  }).format(value);
 }

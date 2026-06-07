@@ -1,10 +1,13 @@
 import type { ReactNode } from "react";
-import { Activity, Bell, Search } from "lucide-react";
+import { Activity } from "lucide-react";
+import { InsightRibbon } from "@/components/layout/insight-ribbon";
 import { SidebarNav } from "@/components/layout/sidebar-nav";
-import { Button } from "@/components/ui/button";
+import { getInsightRibbonData } from "@/lib/data/insight-ribbon";
 
 // AppShell provides the shared navigation, top bar, and responsive content frame.
 export function AppShell({ children }: { children: ReactNode }) {
+  const insightRibbonData = getInsightRibbonData();
+
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto flex min-h-screen w-full max-w-[1440px] flex-col lg:flex-row">
@@ -23,15 +26,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         <div className="flex min-w-0 flex-1 flex-col">
           <header className="sticky top-0 z-20 border-b bg-background/80 px-3 py-2 backdrop-blur md:px-5">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border bg-card/75 px-3 py-2 shadow-[0_10px_30px_rgba(0,0,0,0.16)]">
-                <Search className="size-4 text-muted-foreground" aria-hidden="true" />
-                <span className="truncate text-sm text-muted-foreground">Search holdings, dividends, transactions</span>
-              </div>
-              <Button variant="outline" size="icon" aria-label="Notifications">
-                <Bell aria-hidden="true" />
-              </Button>
-            </div>
+            <InsightRibbon data={insightRibbonData} />
           </header>
 
           <main className="flex-1 px-3 py-4 pb-24 md:px-5 lg:px-6 lg:pb-4">{children}</main>

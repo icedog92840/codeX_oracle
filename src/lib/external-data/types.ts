@@ -12,6 +12,15 @@ export type CachedResponse<T> = {
   cacheKey: string;
 };
 
+// SourceFreshness explains when one cached provider response was fetched and when it expires.
+export type SourceFreshness = {
+  cacheKey: string;
+  expiresAt: string;
+  fetchedAt: string;
+  isStale: boolean;
+  source: ExternalDataSource;
+};
+
 // ProviderAvailability reports whether a provider can be called with the current local env.
 export type ProviderAvailability = {
   enabled: boolean;
@@ -24,6 +33,7 @@ export type LiveQuote = {
   ticker: string;
   price: number;
   currency?: string;
+  freshness?: SourceFreshness;
   name?: string;
   percentChange?: number;
   source: ExternalDataSource;
@@ -33,6 +43,7 @@ export type LiveQuote = {
 export type HistoricalOhlc = {
   ticker: string;
   candles: OhlcCandle[];
+  freshness?: SourceFreshness;
   source: ExternalDataSource;
 };
 
@@ -57,6 +68,7 @@ export type FundamentalSnapshot = {
   bookValuePerShare?: number;
   returnOnEquity?: number;
   debtToEquity?: number;
+  freshness?: SourceFreshness;
   source: ExternalDataSource;
 };
 
@@ -65,6 +77,7 @@ export type StockNewsItem = {
   title: string;
   url: string;
   publishedAt?: string;
+  freshness?: SourceFreshness;
   sourceName?: string;
   summary?: string;
   source: ExternalDataSource;
@@ -78,4 +91,5 @@ export type StockResearchSnapshot = {
   fundamentals?: FundamentalSnapshot;
   news: StockNewsItem[];
   generatedAt: string;
+  refreshed: boolean;
 };

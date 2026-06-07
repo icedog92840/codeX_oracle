@@ -20,11 +20,13 @@ export function buildCacheKey(provider: ExternalDataSource, endpoint: string, pa
 // getCachedOrLoad returns fresh cached data first, otherwise calls the loader and stores the result.
 export async function getCachedOrLoad<T>({
   cacheKey,
+  forceRefresh = false,
   loader,
   provider,
   ttlMs,
 }: {
   cacheKey: string;
+  forceRefresh?: boolean;
   loader: () => Promise<T>;
   provider: ExternalDataSource;
   ttlMs: number;
@@ -32,11 +34,22 @@ export async function getCachedOrLoad<T>({
   const now = Date.now();
   const cached = await readCache<T>(cacheKey);
 
-  if (cached && new Date(cached.expiresAt).getTime() > now) {
+  if (!forceRefresh && cached && new Date(cached.expiresAt).getTime() > now) {
     return cached;
   }
 
-  const data = await loader();
+  let data: T;
+
+  try {
+    data = await loader();
+  } catch (error) {
+    if (cached) {
+      return cached;
+    }
+
+    throw error;
+  }
+
   const entry: CacheEntry<T> = {
     cacheKey,
     data,

@@ -1,5 +1,6 @@
 import { cacheTtls, freeApiBudgets, getProviderAvailability } from "@/lib/external-data/provider-config";
 import { fetchJsonWithCache } from "@/lib/external-data/http-client";
+import { buildSourceFreshness } from "@/lib/external-data/freshness";
 import type { LiveQuote, StockNewsItem } from "@/lib/external-data/types";
 
 // FmpQuoteResponse matches the quote fields used from Financial Modeling Prep.
@@ -22,7 +23,7 @@ type FmpNewsResponse = Array<{
 }>;
 
 // getFmpQuote returns a fallback quote when FMP_API_KEY is configured.
-export async function getFmpQuote(ticker: string): Promise<LiveQuote | null> {
+export async function getFmpQuote(ticker: string, options: { forceRefresh?: boolean } = {}): Promise<LiveQuote | null> {
   const availability = getProviderAvailability("fmp");
 
   if (!availability.enabled) {
@@ -36,6 +37,7 @@ export async function getFmpQuote(ticker: string): Promise<LiveQuote | null> {
     budget: freeApiBudgets.fmp,
     cacheParts: { symbol },
     endpoint: "quote",
+    forceRefresh: options.forceRefresh,
     provider: "fmp",
     ttlMs: cacheTtls.quote,
     url: url.toString(),
@@ -47,6 +49,7 @@ export async function getFmpQuote(ticker: string): Promise<LiveQuote | null> {
   }
 
   return {
+    freshness: buildSourceFreshness(response),
     name: quote.name,
     percentChange: quote.changesPercentage,
     price: quote.price,
@@ -56,7 +59,7 @@ export async function getFmpQuote(ticker: string): Promise<LiveQuote | null> {
 }
 
 // getFmpStockNews returns recent ticker headlines when FMP_API_KEY is configured.
-export async function getFmpStockNews(ticker: string, limit = 10): Promise<StockNewsItem[]> {
+export async function getFmpStockNews(ticker: string, limit = 10, options: { forceRefresh?: boolean } = {}): Promise<StockNewsItem[]> {
   const availability = getProviderAvailability("fmp");
 
   if (!availability.enabled) {
@@ -72,6 +75,7 @@ export async function getFmpStockNews(ticker: string, limit = 10): Promise<Stock
     budget: freeApiBudgets.fmp,
     cacheParts: { limit, symbol },
     endpoint: "stock_news",
+    forceRefresh: options.forceRefresh,
     provider: "fmp",
     ttlMs: cacheTtls.news,
     url: url.toString(),
@@ -81,6 +85,7 @@ export async function getFmpStockNews(ticker: string, limit = 10): Promise<Stock
     .filter((item) => item.title && item.url)
     .map((item) => ({
       publishedAt: item.publishedDate,
+      freshness: buildSourceFreshness(response),
       source: "fmp",
       sourceName: item.site,
       summary: item.text,

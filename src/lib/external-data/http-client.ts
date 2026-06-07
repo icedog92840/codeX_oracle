@@ -7,6 +7,7 @@ type FetchOptions = {
   budget: ApiBudgetPolicy;
   cacheParts: Record<string, string | number | undefined>;
   endpoint: string;
+  forceRefresh?: boolean;
   headers?: HeadersInit;
   provider: ExternalDataSource;
   timeoutMs?: number;
@@ -20,6 +21,7 @@ export async function fetchJsonWithCache<T>(options: FetchOptions): Promise<Cach
 
   return getCachedOrLoad<T>({
     cacheKey,
+    forceRefresh: options.forceRefresh,
     provider: options.provider,
     ttlMs: options.ttlMs,
     loader: async () => {
@@ -35,6 +37,7 @@ export async function fetchTextWithCache(options: FetchOptions): Promise<CachedR
 
   return getCachedOrLoad<string>({
     cacheKey,
+    forceRefresh: options.forceRefresh,
     provider: options.provider,
     ttlMs: options.ttlMs,
     loader: async () => {

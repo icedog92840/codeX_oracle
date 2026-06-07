@@ -5,7 +5,7 @@ import { AlertCircle, Bookmark, BookmarkCheck, ExternalLink, Info, Loader2, News
 import { getAnalyzerDataProvider } from "@/lib/analyzer/analyzer-data-resolver";
 import { buildAnalyzerScan } from "@/lib/analyzer/technical-score";
 import type { AnalyzerScan, OhlcCandle, ValueMetric, ValueScore, WatchlistItem } from "@/lib/analyzer/types";
-import type { FundamentalSnapshot, StockResearchSnapshot } from "@/lib/external-data/types";
+import type { FundamentalSnapshot, SourceFreshness, StockResearchSnapshot } from "@/lib/external-data/types";
 import { cn } from "@/lib/utils";
 
 // LoadingMessages are displayed one at a time while the analyzer simulates the local scan pipeline.
@@ -75,8 +75,10 @@ export function StockAnalyzer() {
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
   const [snapshot, setSnapshot] = useState<SnapshotPayload | null>(null);
   const [snapshotError, setSnapshotError] = useState<string | null>(null);
+  const [snapshotResearch, setSnapshotResearch] = useState<StockResearchSnapshot | null>(null);
   const [snapshotTicker, setSnapshotTicker] = useState<string | null>(null);
   const [isSnapshotLoading, setIsSnapshotLoading] = useState(false);
+  const [isResearchRefreshing, setIsResearchRefreshing] = useState(false);
   const isSaved = scan ? watchlist.some((item) => item.ticker === scan.ticker) : false;
 
   useEffect(() => {
@@ -193,6 +195,7 @@ export function StockAnalyzer() {
 
     setSnapshot(null);
     setSnapshotError(null);
+    setSnapshotResearch(null);
     setSnapshotTicker(normalizedTicker);
     setIsSnapshotLoading(true);
 
@@ -215,8 +218,40 @@ export function StockAnalyzer() {
   function closeSnapshotDrawer() {
     setSnapshot(null);
     setSnapshotError(null);
+    setSnapshotResearch(null);
     setSnapshotTicker(null);
     setIsSnapshotLoading(false);
+    setIsResearchRefreshing(false);
+  }
+
+  // refreshSnapshotResearch refreshes cached research/news without overwriting the saved scan score.
+  async function refreshSnapshotResearch(ticker: string) {
+    setIsResearchRefreshing(true);
+    setSnapshotError(null);
+
+    try {
+      const research = await fetchResearchSnapshot(ticker, { forceRefresh: true });
+
+      if (!research) {
+        throw new Error("Research refresh unavailable.");
+      }
+
+      setSnapshotResearch(research);
+      setSnapshot((currentSnapshot) => currentSnapshot ? {
+        ...currentSnapshot,
+        news: research.news.map((item) => ({
+          publishedAt: item.publishedAt,
+          sourceName: item.sourceName ?? item.source,
+          summary: item.summary,
+          title: item.title,
+          url: item.url,
+        })),
+      } : currentSnapshot);
+    } catch {
+      setSnapshotError("Research data could not be refreshed. Check provider settings in the Data panel.");
+    } finally {
+      setIsResearchRefreshing(false);
+    }
   }
 
   return (
@@ -260,7 +295,10 @@ export function StockAnalyzer() {
         <SnapshotDrawer
           error={snapshotError}
           isLoading={isSnapshotLoading}
+          isResearchRefreshing={isResearchRefreshing}
           onClose={closeSnapshotDrawer}
+          onRefreshResearch={refreshSnapshotResearch}
+          research={snapshotResearch}
           snapshot={snapshot}
           ticker={snapshotTicker}
         />
@@ -716,13 +754,19 @@ function WatchlistMetric({ accent = false, label, value }: { accent?: boolean; l
 function SnapshotDrawer({
   error,
   isLoading,
+  isResearchRefreshing,
   onClose,
+  onRefreshResearch,
+  research,
   snapshot,
   ticker,
 }: {
   error: string | null;
   isLoading: boolean;
+  isResearchRefreshing: boolean;
   onClose: () => void;
+  onRefreshResearch: (ticker: string) => void;
+  research: StockResearchSnapshot | null;
   snapshot: SnapshotPayload | null;
   ticker: string;
 }) {
@@ -770,11 +814,29 @@ function SnapshotDrawer({
                   <div className="min-w-0">
                     <h4 className="truncate text-lg font-semibold">{latestScan.companyName}</h4>
                     <p className="font-mono text-xs text-muted-foreground">Saved {formatShortDate(latestScan.createdAt)} / {latestScan.source}</p>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      <SourceTag label={latestScan.source === "mock" ? "Mock OHLC" : "Live OHLC"} tone={latestScan.source === "mock" ? "warning" : "positive"} />
+                      {latestScorecard?.dataConfidence.provider ? <SourceTag label={latestScorecard.dataConfidence.provider} tone="positive" /> : <SourceTag label="Estimated Value" tone="warning" />}
+                      {research?.quote ? <SourceTag label={research.quote.source} tone="positive" /> : null}
+                      {research?.news.length ? <SourceTag label="News cached" tone="accent" /> : null}
+                    </div>
                   </div>
                   <div className="rounded-xl border bg-[#191929] px-3 py-2 text-right">
                     <p className="font-mono text-2xl font-semibold text-primary">{latestScan.grade}</p>
                     <p className="font-mono text-xs text-muted-foreground">{latestScan.score}/100</p>
                   </div>
+                </div>
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border bg-[#191929] p-2">
+                  <ResearchFreshnessLine research={research} />
+                  <button
+                    className="inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs text-muted-foreground transition-colors hover:border-primary/60 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+                    disabled={isResearchRefreshing}
+                    onClick={() => onRefreshResearch(ticker)}
+                    type="button"
+                  >
+                    <RotateCcw className={cn("size-3.5", isResearchRefreshing && "animate-spin text-primary")} aria-hidden="true" />
+                    {isResearchRefreshing ? "Refreshing" : "Refresh Research"}
+                  </button>
                 </div>
                 <p className="mt-3 text-sm leading-6 text-muted-foreground">{latestScan.summary}</p>
               </section>
@@ -873,6 +935,51 @@ function SnapshotMetric({ label, value }: { label: string; value: string }) {
     <div className="rounded-xl border bg-card/90 p-3">
       <p className="text-[10px] uppercase text-muted-foreground">{label}</p>
       <p className="mt-1 truncate font-mono text-sm font-semibold">{value}</p>
+    </div>
+  );
+}
+
+// SourceTag renders compact source labels such as Mock, SEC, FMP, or Twelve Data.
+function SourceTag({ label, tone = "neutral" }: { label: string; tone?: "accent" | "positive" | "neutral" | "warning" }) {
+  return (
+    <span
+      className={cn(
+        "rounded-full border px-2 py-0.5 font-mono text-[10px]",
+        tone === "accent" && "border-primary/40 text-primary",
+        tone === "positive" && "border-emerald-300/30 text-emerald-300",
+        tone === "warning" && "border-amber-200/30 text-amber-200",
+        tone === "neutral" && "border-border text-muted-foreground",
+      )}
+    >
+      {formatSourceLabel(label)}
+    </span>
+  );
+}
+
+// ResearchFreshnessLine summarizes whether refreshed research exists and when its data expires.
+function ResearchFreshnessLine({ research }: { research: StockResearchSnapshot | null }) {
+  const freshness = [
+    research?.quote?.freshness,
+    research?.ohlc?.freshness,
+    research?.fundamentals?.freshness,
+    research?.news.find((item) => item.freshness)?.freshness,
+  ].filter((item): item is SourceFreshness => Boolean(item));
+  const oldestFetchedAt = freshness.slice().sort((left, right) => left.fetchedAt.localeCompare(right.fetchedAt))[0]?.fetchedAt;
+  const staleCount = freshness.filter((item) => item.isStale).length;
+
+  if (!research) {
+    return <p className="text-xs text-muted-foreground">Research freshness has not been refreshed in this drawer yet.</p>;
+  }
+
+  return (
+    <div className="min-w-0 text-xs text-muted-foreground">
+      <p className="truncate">
+        Research {research.refreshed ? "refreshed" : "loaded"} {formatShortDate(research.generatedAt)}
+        {oldestFetchedAt ? ` / oldest cache ${formatShortDate(oldestFetchedAt)}` : ""}
+      </p>
+      <p className={cn("mt-0.5 font-mono text-[10px]", staleCount > 0 ? "text-amber-200" : "text-emerald-300")}>
+        {freshness.length ? `${freshness.length} cached source${freshness.length === 1 ? "" : "s"} / ${staleCount} stale` : "No provider source connected"}
+      </p>
     </div>
   );
 }
@@ -981,9 +1088,9 @@ async function persistAnalyzerScan(scan: AnalyzerScan, fundamentals?: Fundamenta
 }
 
 // fetchResearchSnapshot asks the local research route for cached fundamentals and news, then fails softly.
-async function fetchResearchSnapshot(ticker: string): Promise<StockResearchSnapshot | null> {
+async function fetchResearchSnapshot(ticker: string, options: { forceRefresh?: boolean } = {}): Promise<StockResearchSnapshot | null> {
   try {
-    const response = await fetch(`/api/research/${encodeURIComponent(ticker)}`);
+    const response = await fetch(`/api/research/${encodeURIComponent(ticker)}${options.forceRefresh ? "?refresh=1" : ""}`);
 
     if (!response.ok) {
       return null;
@@ -1158,4 +1265,19 @@ function formatShortDate(value: string) {
     month: "short",
     day: "numeric",
   }).format(new Date(value));
+}
+
+// formatSourceLabel converts provider slugs into compact readable labels.
+function formatSourceLabel(value: string) {
+  const labels: Record<string, string> = {
+    "alpha-vantage": "Alpha Vantage",
+    fmp: "FMP",
+    live: "Live",
+    mock: "Mock",
+    "rss-news": "RSS News",
+    "sec-edgar": "SEC",
+    "twelve-data": "Twelve Data",
+  };
+
+  return labels[value] ?? value;
 }

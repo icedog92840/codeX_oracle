@@ -1,9 +1,10 @@
 import { cacheTtls, freeApiBudgets, getProviderAvailability } from "@/lib/external-data/provider-config";
 import { fetchTextWithCache } from "@/lib/external-data/http-client";
+import { buildSourceFreshness } from "@/lib/external-data/freshness";
 import type { StockNewsItem } from "@/lib/external-data/types";
 
 // getConfiguredRssNews returns ticker headlines from STOCK_NEWS_RSS_URL_TEMPLATE when configured.
-export async function getConfiguredRssNews(ticker: string, limit = 10): Promise<StockNewsItem[]> {
+export async function getConfiguredRssNews(ticker: string, limit = 10, options: { forceRefresh?: boolean } = {}): Promise<StockNewsItem[]> {
   const availability = getProviderAvailability("rss-news");
 
   if (!availability.enabled) {
@@ -17,12 +18,16 @@ export async function getConfiguredRssNews(ticker: string, limit = 10): Promise<
     budget: freeApiBudgets.rssNews,
     cacheParts: { limit, symbol },
     endpoint: "rss_news",
+    forceRefresh: options.forceRefresh,
     provider: "rss-news",
     ttlMs: cacheTtls.news,
     url,
   });
 
-  return parseRssItems(response.data, limit);
+  return parseRssItems(response.data, limit).map((item) => ({
+    ...item,
+    freshness: buildSourceFreshness(response),
+  }));
 }
 
 // parseRssItems extracts a compact headline list from ordinary RSS XML.

@@ -7,13 +7,14 @@ import { saveNewsItems } from "@/lib/db/repositories/research-store";
 import type { StockResearchSnapshot } from "@/lib/external-data/types";
 
 // getStockResearchSnapshot assembles cached quote, candles, fundamentals, and news for one ticker.
-export async function getStockResearchSnapshot(tickerInput: string): Promise<StockResearchSnapshot> {
+export async function getStockResearchSnapshot(tickerInput: string, options: { forceRefresh?: boolean } = {}): Promise<StockResearchSnapshot> {
   const ticker = normalizeTicker(tickerInput);
+  const providerOptions = { forceRefresh: options.forceRefresh };
   const [quote, ohlc, fundamentals, news] = await Promise.all([
-    getFirstResolved([() => getTwelveDataQuote(ticker), () => getFmpQuote(ticker)]),
-    getFirstResolved([() => getTwelveDataHistoricalOhlc(ticker), () => getAlphaVantageHistoricalOhlc(ticker)]),
-    getSecFundamentals(ticker),
-    getCombinedNews(ticker),
+    getFirstResolved([() => getTwelveDataQuote(ticker, providerOptions), () => getFmpQuote(ticker, providerOptions)]),
+    getFirstResolved([() => getTwelveDataHistoricalOhlc(ticker, 200, providerOptions), () => getAlphaVantageHistoricalOhlc(ticker, 200, providerOptions)]),
+    getSecFundamentals(ticker, providerOptions),
+    getCombinedNews(ticker, providerOptions),
   ]);
 
   return {
@@ -22,13 +23,14 @@ export async function getStockResearchSnapshot(tickerInput: string): Promise<Sto
     news,
     ohlc: ohlc ?? undefined,
     quote: quote ?? undefined,
+    refreshed: Boolean(options.forceRefresh),
     ticker,
   };
 }
 
 // getCombinedNews merges configured RSS headlines with optional FMP stock news.
-async function getCombinedNews(ticker: string) {
-  const results = await Promise.allSettled([getConfiguredRssNews(ticker), getFmpStockNews(ticker)]);
+async function getCombinedNews(ticker: string, options: { forceRefresh?: boolean }) {
+  const results = await Promise.allSettled([getConfiguredRssNews(ticker, 10, options), getFmpStockNews(ticker, 10, options)]);
   const items = results.flatMap((result) => (result.status === "fulfilled" ? result.value : []));
   const seen = new Set<string>();
 

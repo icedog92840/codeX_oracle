@@ -1,5 +1,6 @@
 import { cacheTtls, freeApiBudgets, getProviderAvailability } from "@/lib/external-data/provider-config";
 import { fetchJsonWithCache } from "@/lib/external-data/http-client";
+import { buildSourceFreshness } from "@/lib/external-data/freshness";
 import type { HistoricalOhlc, LiveQuote } from "@/lib/external-data/types";
 
 // TwelveDataTimeSeriesResponse matches the fields used from Twelve Data's time_series endpoint.
@@ -24,7 +25,7 @@ type TwelveDataQuoteResponse = {
 };
 
 // getTwelveDataHistoricalOhlc returns daily candles when TWELVE_DATA_API_KEY is configured.
-export async function getTwelveDataHistoricalOhlc(ticker: string, outputSize = 200): Promise<HistoricalOhlc | null> {
+export async function getTwelveDataHistoricalOhlc(ticker: string, outputSize = 200, options: { forceRefresh?: boolean } = {}): Promise<HistoricalOhlc | null> {
   const availability = getProviderAvailability("twelve-data");
 
   if (!availability.enabled) {
@@ -42,6 +43,7 @@ export async function getTwelveDataHistoricalOhlc(ticker: string, outputSize = 2
     budget: freeApiBudgets.twelveData,
     cacheParts: { outputSize, symbol },
     endpoint: "time_series_1day",
+    forceRefresh: options.forceRefresh,
     provider: "twelve-data",
     ttlMs: cacheTtls.historicalOhlc,
     url: url.toString(),
@@ -56,13 +58,14 @@ export async function getTwelveDataHistoricalOhlc(ticker: string, outputSize = 2
       open: Number(value.open),
       volume: value.volume ? Number(value.volume) : undefined,
     })),
+    freshness: buildSourceFreshness(response),
     source: "twelve-data",
     ticker: symbol,
   };
 }
 
 // getTwelveDataQuote returns a current or delayed quote when TWELVE_DATA_API_KEY is configured.
-export async function getTwelveDataQuote(ticker: string): Promise<LiveQuote | null> {
+export async function getTwelveDataQuote(ticker: string, options: { forceRefresh?: boolean } = {}): Promise<LiveQuote | null> {
   const availability = getProviderAvailability("twelve-data");
 
   if (!availability.enabled) {
@@ -78,6 +81,7 @@ export async function getTwelveDataQuote(ticker: string): Promise<LiveQuote | nu
     budget: freeApiBudgets.twelveData,
     cacheParts: { symbol },
     endpoint: "quote",
+    forceRefresh: options.forceRefresh,
     provider: "twelve-data",
     ttlMs: cacheTtls.quote,
     url: url.toString(),
@@ -85,6 +89,7 @@ export async function getTwelveDataQuote(ticker: string): Promise<LiveQuote | nu
 
   return {
     currency: response.data.currency,
+    freshness: buildSourceFreshness(response),
     name: response.data.name,
     percentChange: response.data.percent_change ? Number(response.data.percent_change) : undefined,
     price: Number(response.data.close ?? 0),

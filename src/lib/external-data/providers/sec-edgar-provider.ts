@@ -1,5 +1,6 @@
 import { cacheTtls, freeApiBudgets, getProviderAvailability } from "@/lib/external-data/provider-config";
 import { fetchJsonWithCache } from "@/lib/external-data/http-client";
+import { buildSourceFreshness } from "@/lib/external-data/freshness";
 import type { FundamentalSnapshot } from "@/lib/external-data/types";
 
 // SecTickerIndexResponse is SEC's company_tickers.json object shape.
@@ -32,7 +33,7 @@ type SecFactRow = {
 };
 
 // getSecFundamentals derives value-investor metrics from SEC companyfacts when configured.
-export async function getSecFundamentals(ticker: string): Promise<FundamentalSnapshot | null> {
+export async function getSecFundamentals(ticker: string, options: { forceRefresh?: boolean } = {}): Promise<FundamentalSnapshot | null> {
   const availability = getProviderAvailability("sec-edgar");
 
   if (!availability.enabled) {
@@ -51,13 +52,17 @@ export async function getSecFundamentals(ticker: string): Promise<FundamentalSna
     budget: freeApiBudgets.secEdgar,
     cacheParts: { cik: paddedCik },
     endpoint: "companyfacts",
+    forceRefresh: options.forceRefresh,
     headers: getSecHeaders(),
     provider: "sec-edgar",
     ttlMs: cacheTtls.companyFacts,
     url: `https://data.sec.gov/api/xbrl/companyfacts/CIK${paddedCik}.json`,
   });
 
-  return buildFundamentalSnapshot(symbol, response.data);
+  return {
+    ...buildFundamentalSnapshot(symbol, response.data),
+    freshness: buildSourceFreshness(response),
+  };
 }
 
 // getCikForTicker maps a ticker to its SEC CIK using the cached SEC ticker index.

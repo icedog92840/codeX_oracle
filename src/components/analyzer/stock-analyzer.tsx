@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { AlertCircle, Bookmark, BookmarkCheck, Loader2, RotateCcw, Search, Trash2, X } from "lucide-react";
+import { AlertCircle, Bookmark, BookmarkCheck, ExternalLink, Loader2, Newspaper, RotateCcw, Search, Trash2, X } from "lucide-react";
 import { getAnalyzerDataProvider } from "@/lib/analyzer/analyzer-data-resolver";
 import { buildAnalyzerScan } from "@/lib/analyzer/technical-score";
 import type { AnalyzerScan, OhlcCandle, WatchlistItem } from "@/lib/analyzer/types";
@@ -22,6 +22,46 @@ const storageKeys = {
   watchlist: "codex-oracle.analyzer.watchlist",
 };
 
+// SnapshotScan stores the compact saved scan shape returned by the SQLite snapshot route.
+type SnapshotScan = {
+  candleCount: number;
+  companyName: string;
+  createdAt: string;
+  dividendYield: number;
+  grade: string;
+  id: string;
+  metrics: {
+    macd?: number;
+    resistance20?: number;
+    rsi14?: number;
+    sma50?: number;
+    sma200?: number;
+    support20?: number;
+  };
+  price: number;
+  score: number;
+  source: string;
+  summary: string;
+  ticker: string;
+};
+
+// SnapshotNews stores one cached news headline returned by the SQLite snapshot route.
+type SnapshotNews = {
+  publishedAt?: string | null;
+  sourceName?: string | null;
+  summary?: string | null;
+  title: string;
+  url: string;
+};
+
+// SnapshotPayload stores the full ticker snapshot drawer payload.
+type SnapshotPayload = {
+  latestScan: SnapshotScan | null;
+  news: SnapshotNews[];
+  scans: SnapshotScan[];
+  ticker: string;
+};
+
 // StockAnalyzer renders the full local stock analyzer workflow.
 export function StockAnalyzer() {
   const [tickerInput, setTickerInput] = useState("AAPL");
@@ -31,6 +71,10 @@ export function StockAnalyzer() {
   const [error, setError] = useState<string | null>(null);
   const [recentScans, setRecentScans] = useState<AnalyzerScan[]>([]);
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
+  const [snapshot, setSnapshot] = useState<SnapshotPayload | null>(null);
+  const [snapshotError, setSnapshotError] = useState<string | null>(null);
+  const [snapshotTicker, setSnapshotTicker] = useState<string | null>(null);
+  const [isSnapshotLoading, setIsSnapshotLoading] = useState(false);
   const isSaved = scan ? watchlist.some((item) => item.ticker === scan.ticker) : false;
 
   useEffect(() => {
@@ -133,6 +177,42 @@ export function StockAnalyzer() {
     window.localStorage.removeItem(storageKeys.recentScans);
   }
 
+  // openSnapshotDrawer loads a saved SQLite scan snapshot for one ticker.
+  async function openSnapshotDrawer(ticker: string) {
+    const normalizedTicker = normalizeTicker(ticker);
+
+    if (!normalizedTicker) {
+      return;
+    }
+
+    setSnapshot(null);
+    setSnapshotError(null);
+    setSnapshotTicker(normalizedTicker);
+    setIsSnapshotLoading(true);
+
+    try {
+      const response = await fetch(`/api/analyzer/snapshot/${encodeURIComponent(normalizedTicker)}`);
+
+      if (!response.ok) {
+        throw new Error("Snapshot unavailable.");
+      }
+
+      setSnapshot(await response.json() as SnapshotPayload);
+    } catch {
+      setSnapshotError("Saved scan snapshot could not be loaded.");
+    } finally {
+      setIsSnapshotLoading(false);
+    }
+  }
+
+  // closeSnapshotDrawer closes the ticker snapshot drawer.
+  function closeSnapshotDrawer() {
+    setSnapshot(null);
+    setSnapshotError(null);
+    setSnapshotTicker(null);
+    setIsSnapshotLoading(false);
+  }
+
   return (
     <div className="space-y-4">
       <section className="rounded-xl border bg-card/90 p-3 shadow-[0_18px_45px_rgba(0,0,0,0.20)]">
@@ -167,8 +247,18 @@ export function StockAnalyzer() {
 
       <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_420px]">
         <RecentScansPanel onAnalyze={handleAnalyze} onClear={clearRecentScans} recentScans={recentScans} />
-        <WatchlistPanel onAnalyze={handleAnalyze} onRemove={removeWatchlistItem} watchlist={watchlist} />
+        <WatchlistPanel onAnalyze={handleAnalyze} onOpenSnapshot={openSnapshotDrawer} onRemove={removeWatchlistItem} watchlist={watchlist} />
       </div>
+
+      {snapshotTicker ? (
+        <SnapshotDrawer
+          error={snapshotError}
+          isLoading={isSnapshotLoading}
+          onClose={closeSnapshotDrawer}
+          snapshot={snapshot}
+          ticker={snapshotTicker}
+        />
+      ) : null}
     </div>
   );
 }
@@ -418,10 +508,12 @@ function RecentScansPanel({
 // WatchlistPanel shows manually saved tickers for repeat scans.
 function WatchlistPanel({
   onAnalyze,
+  onOpenSnapshot,
   onRemove,
   watchlist,
 }: {
   onAnalyze: (event?: FormEvent<HTMLFormElement>, tickerOverride?: string) => void;
+  onOpenSnapshot: (ticker: string) => void;
   onRemove: (ticker: string) => void;
   watchlist: WatchlistItem[];
 }) {
@@ -444,10 +536,15 @@ function WatchlistPanel({
               className="rounded-xl border bg-[#191929] p-3 transition-colors hover:border-primary/50"
             >
               <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="truncate font-mono text-sm font-semibold text-primary">{item.ticker}</p>
-                  <p className="truncate text-xs text-muted-foreground">{item.companyName}</p>
-                </div>
+                <button
+                  className="min-w-0 text-left outline-none transition-colors hover:text-primary focus-visible:text-primary"
+                  onClick={() => onOpenSnapshot(item.ticker)}
+                  type="button"
+                  aria-label={`Open saved ${item.ticker} scan snapshot`}
+                >
+                  <span className="block truncate font-mono text-sm font-semibold text-primary">{item.ticker}</span>
+                  <span className="block truncate text-xs text-muted-foreground">{item.companyName}</span>
+                </button>
                 <div className="flex shrink-0 items-center gap-1">
                   <button
                     className="rounded-xl border p-2 text-muted-foreground transition-colors hover:border-primary/60 hover:text-foreground"
@@ -488,6 +585,150 @@ function WatchlistMetric({ accent = false, label, value }: { accent?: boolean; l
     <div className="rounded-lg border bg-secondary/40 px-2 py-1.5">
       <p className="text-[10px] uppercase text-muted-foreground">{label}</p>
       <p className={cn("mt-1 truncate font-mono text-xs font-semibold", accent ? "text-primary" : "text-foreground")}>{value}</p>
+    </div>
+  );
+}
+
+// SnapshotDrawer renders a saved scan snapshot and cached ticker news from SQLite.
+function SnapshotDrawer({
+  error,
+  isLoading,
+  onClose,
+  snapshot,
+  ticker,
+}: {
+  error: string | null;
+  isLoading: boolean;
+  onClose: () => void;
+  snapshot: SnapshotPayload | null;
+  ticker: string;
+}) {
+  const latestScan = snapshot?.latestScan ?? null;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/55 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label={`${ticker} saved scan snapshot`}>
+      <div className="ml-auto flex h-full w-full max-w-2xl flex-col border-l bg-background shadow-[0_0_60px_rgba(0,0,0,0.50)]">
+        <div className="flex items-start justify-between gap-3 border-b p-4">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase text-primary">Saved Snapshot</p>
+            <h3 className="mt-1 truncate font-mono text-2xl font-semibold">{ticker}</h3>
+          </div>
+          <button
+            className="rounded-xl border p-2 text-muted-foreground transition-colors hover:border-primary/60 hover:text-foreground"
+            onClick={onClose}
+            type="button"
+            aria-label="Close saved scan snapshot"
+          >
+            <X className="size-4" aria-hidden="true" />
+          </button>
+        </div>
+
+        <div className="pill-scrollbar flex-1 overflow-y-auto p-4">
+          {isLoading ? (
+            <div className="rounded-xl border bg-card/90 p-4 text-sm text-muted-foreground">
+              <Loader2 className="mr-2 inline size-4 animate-spin text-primary" aria-hidden="true" />
+              Loading saved scan snapshot...
+            </div>
+          ) : null}
+
+          {!isLoading && error ? <ErrorPanel message={error} /> : null}
+
+          {!isLoading && !error && !latestScan ? (
+            <section className="rounded-xl border bg-card/90 p-4 text-sm text-muted-foreground">
+              No saved SQLite scan snapshot exists for this ticker yet. Run a scan once, then save it to the watchlist.
+            </section>
+          ) : null}
+
+          {!isLoading && latestScan ? (
+            <div className="space-y-3">
+              <section className="rounded-xl border bg-card/90 p-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h4 className="truncate text-lg font-semibold">{latestScan.companyName}</h4>
+                    <p className="font-mono text-xs text-muted-foreground">Saved {formatShortDate(latestScan.createdAt)} / {latestScan.source}</p>
+                  </div>
+                  <div className="rounded-xl border bg-[#191929] px-3 py-2 text-right">
+                    <p className="font-mono text-2xl font-semibold text-primary">{latestScan.grade}</p>
+                    <p className="font-mono text-xs text-muted-foreground">{latestScan.score}/100</p>
+                  </div>
+                </div>
+                <p className="mt-3 text-sm leading-6 text-muted-foreground">{latestScan.summary}</p>
+              </section>
+
+              <section className="grid gap-2 sm:grid-cols-2">
+                <SnapshotMetric label="Price" value={formatCurrency(latestScan.price)} />
+                <SnapshotMetric label="Dividend Yield" value={formatPercent(latestScan.dividendYield)} />
+                <SnapshotMetric label="RSI 14" value={formatMaybeNumber(latestScan.metrics.rsi14, 1)} />
+                <SnapshotMetric label="MACD" value={formatMaybeNumber(latestScan.metrics.macd, 2)} />
+                <SnapshotMetric label="Support" value={formatMaybeCurrency(latestScan.metrics.support20)} />
+                <SnapshotMetric label="Resistance" value={formatMaybeCurrency(latestScan.metrics.resistance20)} />
+                <SnapshotMetric label="50-day SMA" value={formatMaybeCurrency(latestScan.metrics.sma50)} />
+                <SnapshotMetric label="200-day SMA" value={formatMaybeCurrency(latestScan.metrics.sma200)} />
+              </section>
+
+              <section className="rounded-xl border bg-card/90 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <h4 className="text-base font-semibold">Saved Scan History</h4>
+                  <span className="rounded-full border bg-[#191929] px-2 py-1 font-mono text-[10px] text-muted-foreground">{snapshot?.scans.length ?? 0} scans</span>
+                </div>
+                <div className="mt-3 grid gap-2">
+                  {snapshot?.scans.map((scan) => (
+                    <div key={scan.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-xl border bg-[#191929] px-3 py-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-xs text-muted-foreground">{formatShortDate(scan.createdAt)}</p>
+                        <p className="truncate font-mono text-xs">{scan.candleCount} candles saved</p>
+                      </div>
+                      <p className="font-mono text-sm font-semibold text-primary">{scan.grade} / {scan.score}</p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <section className="rounded-xl border bg-card/90 p-3">
+                <div className="flex items-center gap-2">
+                  <Newspaper className="size-4 text-primary" aria-hidden="true" />
+                  <h4 className="text-base font-semibold">Relevant News</h4>
+                </div>
+                <div className="mt-3 grid gap-2">
+                  {snapshot?.news.length ? (
+                    snapshot.news.map((item) => (
+                      <a
+                        key={item.url}
+                        className="rounded-xl border bg-[#191929] p-3 text-sm transition-colors hover:border-primary/60"
+                        href={item.url}
+                        rel="noreferrer"
+                        target="_blank"
+                      >
+                        <span className="flex items-start justify-between gap-3">
+                          <span className="min-w-0">
+                            <span className="block font-medium text-foreground">{item.title}</span>
+                            <span className="mt-1 block text-xs text-muted-foreground">{item.sourceName ?? "Cached news"}{item.publishedAt ? ` / ${formatShortDate(item.publishedAt)}` : ""}</span>
+                          </span>
+                          <ExternalLink className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                        </span>
+                      </a>
+                    ))
+                  ) : (
+                    <p className="rounded-xl border bg-[#191929] p-3 text-sm text-muted-foreground">
+                      No cached news is saved for this ticker yet. News will appear here once a provider or RSS feed is configured and refreshed.
+                    </p>
+                  )}
+                </div>
+              </section>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// SnapshotMetric renders one saved snapshot metric.
+function SnapshotMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border bg-card/90 p-3">
+      <p className="text-[10px] uppercase text-muted-foreground">{label}</p>
+      <p className="mt-1 truncate font-mono text-sm font-semibold">{value}</p>
     </div>
   );
 }
@@ -720,6 +961,16 @@ function formatCompactCurrency(value: number) {
     notation: "compact",
     style: "currency",
   }).format(value);
+}
+
+// formatMaybeCurrency renders optional saved snapshot currency values safely.
+function formatMaybeCurrency(value: number | undefined) {
+  return typeof value === "number" && Number.isFinite(value) ? formatCurrency(value) : "-";
+}
+
+// formatMaybeNumber renders optional saved snapshot numeric values safely.
+function formatMaybeNumber(value: number | undefined, digits: number) {
+  return typeof value === "number" && Number.isFinite(value) ? value.toFixed(digits) : "-";
 }
 
 // formatPercent renders dividend yield and ratio values.

@@ -129,6 +129,20 @@ a {
   background-size: 220% 100%;
 }
 
+.soft-pulse {
+  position: relative;
+}
+
+.soft-pulse::after {
+  animation: soft-pulse 3.2s ease-in-out infinite;
+  border: 1px solid rgba(56, 213, 255, 0.34);
+  border-radius: inherit;
+  content: "";
+  inset: -4px;
+  pointer-events: none;
+  position: absolute;
+}
+
 @keyframes insight-slide {
   from {
     opacity: 0;
@@ -138,6 +152,27 @@ a {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes soft-pulse {
+  0%,
+  100% {
+    opacity: 0.12;
+    transform: scale(0.96);
+  }
+
+  50% {
+    opacity: 0.55;
+    transform: scale(1.05);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .insight-slide,
+  .insight-hairline,
+  .soft-pulse::after {
+    animation: none;
   }
 }
 

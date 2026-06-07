@@ -26,7 +26,7 @@ export function MetricCard({ metric }: { metric: MetricCardValue }) {
           </div>
           <p className="mt-2 font-mono text-xl font-semibold tracking-normal">{metric.value}</p>
         </div>
-        <div className="flex size-8 items-center justify-center rounded-xl bg-secondary text-primary shadow-[0_0_18px_rgba(56,213,255,0.14)]">
+        <div className="soft-pulse flex size-8 items-center justify-center rounded-xl bg-secondary text-primary shadow-[0_0_18px_rgba(56,213,255,0.14)]">
           <Icon className="size-4" aria-hidden="true" />
         </div>
       </div>

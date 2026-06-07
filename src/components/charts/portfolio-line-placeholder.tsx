@@ -16,7 +16,7 @@ export function PortfolioLinePlaceholder({ points }: { points: ChartPoint[] }) {
           <h2 className="text-base font-semibold">Portfolio Trajectory</h2>
           <p className="text-xs text-muted-foreground">CSV-estimated month-end portfolio value</p>
         </div>
-        <span className="rounded-xl bg-accent px-2 py-1 font-mono text-xs text-accent-foreground">CSV</span>
+        <span className="soft-pulse inline-flex rounded-xl bg-accent px-2 py-1 font-mono text-xs text-accent-foreground">CSV</span>
       </div>
 
       <div className="relative">

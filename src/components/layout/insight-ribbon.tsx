@@ -2,13 +2,14 @@
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
-import { BarChart3, ChevronRight, Pause, Sparkles } from "lucide-react";
+import { BarChart3, ChevronRight, Pause, Sparkles, X } from "lucide-react";
 import type { InsightChip, InsightRibbonData, InsightRoutePayload } from "@/lib/data/insight-ribbon";
 import { cn } from "@/lib/utils";
 
 // InsightRibbon replaces the old search placeholder with page-aware local portfolio context.
 export function InsightRibbon({ data }: { data: InsightRibbonData }) {
   const [activeIndex, setActiveIndex] = useState(0);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const pathname = usePathname();
   const analyzerStorageSnapshot = useSyncExternalStore(subscribeAnalyzerStorage, getAnalyzerStorageSnapshot, getEmptyAnalyzerStorageSnapshot);
@@ -21,7 +22,7 @@ export function InsightRibbon({ data }: { data: InsightRibbonData }) {
   const activeItem = rotationItems[activeIndex % rotationItems.length];
 
   useEffect(() => {
-    if (isPaused) {
+    if (isPaused || isExpanded) {
       return;
     }
 
@@ -30,22 +31,22 @@ export function InsightRibbon({ data }: { data: InsightRibbonData }) {
     }, 8000);
 
     return () => window.clearInterval(interval);
-  }, [isPaused, rotationItems.length]);
+  }, [isExpanded, isPaused, rotationItems.length]);
 
   return (
     <section
-      className="group relative overflow-hidden rounded-2xl border bg-card/80 shadow-[0_12px_36px_rgba(0,0,0,0.18)] ring-1 ring-primary/5 backdrop-blur"
+      className={cn(
+        "group relative rounded-2xl border bg-card/80 shadow-[0_12px_36px_rgba(0,0,0,0.18)] ring-1 ring-primary/5 backdrop-blur",
+        isExpanded ? "z-50 overflow-visible" : "overflow-hidden",
+      )}
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
     >
-      <button
+      <div
         className="grid w-full gap-2 p-2 text-left md:grid-cols-[minmax(0,1fr)_minmax(280px,0.72fr)] md:items-center"
-        onClick={() => setActiveIndex((currentIndex) => (currentIndex + 1) % rotationItems.length)}
-        type="button"
-        aria-label="Cycle portfolio insight"
       >
         <div className="flex min-w-0 items-center gap-2">
-          <div className="hidden size-9 shrink-0 items-center justify-center rounded-xl border bg-[#191929] text-primary shadow-[0_0_22px_rgba(56,213,255,0.14)] sm:flex">
+          <div className="soft-pulse hidden size-9 shrink-0 items-center justify-center rounded-xl border bg-[#191929] text-primary shadow-[0_0_22px_rgba(56,213,255,0.14)] sm:flex">
             <BarChart3 className="size-4" aria-hidden="true" />
           </div>
           <div className="grid min-w-0 flex-1 grid-cols-2 gap-1.5 sm:grid-cols-4">
@@ -55,7 +56,13 @@ export function InsightRibbon({ data }: { data: InsightRibbonData }) {
           </div>
         </div>
 
-        <div className="relative min-w-0 rounded-xl border bg-[#191929]/80 px-3 py-2">
+        <button
+          className="relative min-w-0 rounded-xl border bg-[#191929]/80 px-3 py-2 text-left outline-none transition-colors hover:border-primary/50 hover:bg-[#202034] focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/35"
+          onClick={() => setIsExpanded(true)}
+          type="button"
+          aria-expanded={isExpanded}
+          aria-label="Open full portfolio briefing"
+        >
           <div className="flex min-w-0 items-center gap-2">
             {activeItem.type === "principle" ? (
               <Sparkles className="size-3.5 shrink-0 text-accent-foreground" aria-hidden="true" />
@@ -69,8 +76,39 @@ export function InsightRibbon({ data }: { data: InsightRibbonData }) {
             </p>
             {isPaused ? <Pause className="ml-auto hidden size-3 shrink-0 text-muted-foreground md:block" aria-hidden="true" /> : null}
           </div>
+        </button>
+      </div>
+
+      {isExpanded ? (
+        <div className="absolute inset-x-0 top-0 z-40 rounded-2xl border bg-[#191929]/98 p-3 shadow-[0_22px_60px_rgba(0,0,0,0.48)] ring-1 ring-primary/15 backdrop-blur">
+          <div className="flex items-start gap-3">
+            <div className="soft-pulse mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl border bg-secondary text-primary">
+              {activeItem.type === "principle" ? <Sparkles className="size-4" aria-hidden="true" /> : <ChevronRight className="size-4" aria-hidden="true" />}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold uppercase text-primary">{activeItem.label}</p>
+              <p className="mt-1 text-sm leading-6 text-foreground">{activeItem.text}</p>
+            </div>
+            <div className="flex shrink-0 items-center gap-1">
+              <button
+                className="rounded-xl border px-3 py-2 text-xs text-muted-foreground transition-colors hover:border-primary/60 hover:text-foreground"
+                onClick={() => setActiveIndex((currentIndex) => (currentIndex + 1) % rotationItems.length)}
+                type="button"
+              >
+                Next
+              </button>
+              <button
+                className="rounded-xl border p-2 text-muted-foreground transition-colors hover:border-primary/60 hover:text-foreground"
+                onClick={() => setIsExpanded(false)}
+                type="button"
+                aria-label="Close full portfolio briefing"
+              >
+                <X className="size-4" aria-hidden="true" />
+              </button>
+            </div>
+          </div>
         </div>
-      </button>
+      ) : null}
       <div className="insight-hairline absolute inset-x-0 bottom-0 h-px" />
     </section>
   );

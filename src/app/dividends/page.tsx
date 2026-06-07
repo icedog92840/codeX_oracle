@@ -67,6 +67,27 @@ export default async function DividendsPage({
         <Metric label="YoY Change" value={dividendData.yearOverYearChange} detail="Selected year vs previous year" tone={dividendData.yearOverYearTone} />
       </div>
 
+      <div className="grid gap-3 xl:grid-cols-2">
+        <section className="rounded-xl border bg-card/90 p-3 shadow-[0_18px_45px_rgba(0,0,0,0.20)]">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2 className="text-base font-semibold">{dividendData.trendMode === "annual" ? "Annual Payout Trend" : "Monthly Payout Trend"}</h2>
+              <p className="text-xs text-muted-foreground">
+                {dividendData.trendMode === "annual" ? "Dividend totals by calendar year" : "Selected-range dividend totals by month"}
+              </p>
+            </div>
+            <TrendModeSwitch dividendData={dividendData} />
+          </div>
+          <div className="mt-4 flex h-56 items-stretch gap-2 border-b border-l px-2 pb-2">
+            {trendPoints.map((point) => (
+              <TrendBar key={point.label} point={point} maxTotal={maxTrendTotal} />
+            ))}
+          </div>
+        </section>
+
+        <DividendProgressionLineChart points={dividendData.months} selectedRangeLabel={dividendData.selectedRangeLabel} />
+      </div>
+
       <section className="lg:hidden">
         <div className="mb-2 flex flex-col items-start gap-2">
           <div>
@@ -144,64 +165,42 @@ export default async function DividendsPage({
         </div>
       </section>
 
-      <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_420px]">
-        <div className="grid gap-3">
-          <section className="rounded-xl border bg-card/90 p-3 shadow-[0_18px_45px_rgba(0,0,0,0.20)]">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <h2 className="text-base font-semibold">{dividendData.trendMode === "annual" ? "Annual Payout Trend" : "Monthly Payout Trend"}</h2>
-                <p className="text-xs text-muted-foreground">
-                  {dividendData.trendMode === "annual" ? "Dividend totals by calendar year" : "Selected-range dividend totals by month"}
-                </p>
-              </div>
-              <TrendModeSwitch dividendData={dividendData} />
-            </div>
-            <div className="mt-4 flex h-56 items-stretch gap-2 border-b border-l px-2 pb-2">
-              {trendPoints.map((point) => (
-                <TrendBar key={point.label} point={point} maxTotal={maxTrendTotal} />
-              ))}
-            </div>
-          </section>
-
-          <DividendProgressionLineChart points={dividendData.months} selectedRangeLabel={dividendData.selectedRangeLabel} />
+      <section className="overflow-hidden rounded-xl border bg-card/90 shadow-[0_18px_45px_rgba(0,0,0,0.20)]">
+        <div className="border-b px-3 py-2">
+          <h2 className="text-base font-semibold">Dividend Calendar</h2>
+          <p className="text-xs text-muted-foreground">Most recent payments {dividendData.calendarRangeLabel}</p>
         </div>
-
-        <section className="overflow-hidden rounded-xl border bg-card/90 shadow-[0_18px_45px_rgba(0,0,0,0.20)]">
-          <div className="border-b px-3 py-2">
-            <h2 className="text-base font-semibold">Dividend Calendar</h2>
-            <p className="text-xs text-muted-foreground">Most recent payments {dividendData.calendarRangeLabel}</p>
-          </div>
-          <div className="pill-scrollbar scroll-glow max-h-72 overflow-y-auto overflow-x-hidden">
-            {dividendData.calendarEvents.map((event) => (
-              <div key={event.id} className="grid grid-cols-[76px_58px_1fr_82px] gap-2 border-b px-3 py-2 text-xs last:border-b-0">
-                <span className="font-mono text-muted-foreground">{event.date}</span>
-                <span className="font-semibold">{event.ticker}</span>
-                <span className="truncate text-muted-foreground" title={event.description}>{event.description}</span>
-                <span className="text-right font-mono text-emerald-300">{event.amount}</span>
-              </div>
-            ))}
-          </div>
-        </section>
-      </div>
+        <div className="pill-scrollbar scroll-glow max-h-72 overflow-y-auto overflow-x-hidden">
+          {dividendData.calendarEvents.map((event) => (
+            <div key={event.id} className="grid grid-cols-[76px_58px_1fr_82px] gap-2 border-b px-3 py-2 text-xs last:border-b-0">
+              <span className="font-mono text-muted-foreground">{event.date}</span>
+              <span className="font-semibold">{event.ticker}</span>
+              <span className="truncate text-muted-foreground" title={event.description}>{event.description}</span>
+              <span className="text-right font-mono text-emerald-300">{event.amount}</span>
+            </div>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }
 
-// DividendProgressionLineChart renders a month-over-month line graph for selected-range dividends.
+// DividendProgressionLineChart renders a cumulative month-over-month line graph for selected-range dividends.
 function DividendProgressionLineChart({ points, selectedRangeLabel }: { points: DividendTrendPoint[]; selectedRangeLabel: string }) {
-  const chart = buildDividendLineGeometry(points);
+  const cumulativePoints = buildCumulativeDividendPoints(points);
+  const chart = buildDividendLineGeometry(cumulativePoints);
 
   return (
     <section className="rounded-xl border bg-card/90 p-3 shadow-[0_18px_45px_rgba(0,0,0,0.20)]">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
           <h2 className="text-base font-semibold">Dividend Progression</h2>
-          <p className="text-xs text-muted-foreground">Month-over-month dividend cash in {selectedRangeLabel}</p>
+          <p className="text-xs text-muted-foreground">Cumulative month-over-month dividend cash in {selectedRangeLabel}</p>
         </div>
-        <span className="rounded-xl bg-accent px-2 py-1 font-mono text-xs text-accent-foreground">Line</span>
+        <span className="soft-pulse inline-flex rounded-xl bg-accent px-2 py-1 font-mono text-xs text-accent-foreground">Cumulative</span>
       </div>
 
-      <svg className="h-64 w-full overflow-visible" viewBox="0 0 720 260" role="img" aria-label="Dividend month-over-month progression line chart">
+      <svg className="h-64 w-full overflow-visible" viewBox="0 0 720 260" role="img" aria-label="Cumulative dividend month-over-month progression line chart">
         <defs>
           <linearGradient id="dividendProgressionFill" x1="0" x2="0" y1="0" y2="1">
             <stop offset="0%" stopColor="#25e0bf" stopOpacity="0.22" />
@@ -217,15 +216,15 @@ function DividendProgressionLineChart({ points, selectedRangeLabel }: { points: 
         <path d={chart.fillPath} fill="url(#dividendProgressionFill)" />
         <path d={chart.path} fill="none" stroke="#25e0bf" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
         {chart.points.map((point, index) => (
-          <g key={`${points[index].label}-${points[index].total}`} className="group/point">
+          <g key={`${cumulativePoints[index].label}-${cumulativePoints[index].total}`} className="group/point">
             <circle cx={point.x} cy={point.y} r="3" className="fill-emerald-300 transition-transform group-hover/point:scale-125" stroke="#171724" strokeWidth="2" />
             <g className="pointer-events-none opacity-0 transition-opacity group-hover/point:opacity-100">
               <rect x={Math.min(Math.max(point.x - 44, 62), 612)} y={Math.max(point.y - 48, 4)} width="88" height="36" rx="10" className="fill-[#191929] stroke-border" />
               <text x={Math.min(Math.max(point.x, 106), 656)} y={Math.max(point.y - 27, 25)} textAnchor="middle" className="fill-foreground font-mono text-[10px]">
-                {points[index].displayTotal}
+                {cumulativePoints[index].displayTotal}
               </text>
               <text x={Math.min(Math.max(point.x, 106), 656)} y={Math.max(point.y - 13, 39)} textAnchor="middle" className="fill-muted-foreground text-[9px]">
-                {points[index].label}
+                {cumulativePoints[index].label}
               </text>
             </g>
           </g>
@@ -238,6 +237,21 @@ function DividendProgressionLineChart({ points, selectedRangeLabel }: { points: 
       </svg>
     </section>
   );
+}
+
+// buildCumulativeDividendPoints converts monthly totals into Jan, Jan+Feb, Jan+Feb+Mar style values.
+function buildCumulativeDividendPoints(points: DividendTrendPoint[]): DividendTrendPoint[] {
+  let runningTotal = 0;
+
+  return points.map((point) => {
+    runningTotal += point.total;
+
+    return {
+      ...point,
+      total: runningTotal,
+      displayTotal: formatFullCurrency(runningTotal),
+    };
+  });
 }
 
 // DividendMobileCard renders one dividend asset without requiring horizontal table scrolling.
@@ -603,6 +617,15 @@ function formatCompactCurrency(value: number) {
     currency: "USD",
     maximumFractionDigits: 1,
     notation: "compact",
+    style: "currency",
+  }).format(value);
+}
+
+// formatFullCurrency renders exact dollar values for cumulative chart tooltips.
+function formatFullCurrency(value: number) {
+  return new Intl.NumberFormat("en-US", {
+    currency: "USD",
+    maximumFractionDigits: 2,
     style: "currency",
   }).format(value);
 }

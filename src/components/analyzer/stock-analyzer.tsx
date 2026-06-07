@@ -49,7 +49,9 @@ type SnapshotScan = {
 
 // SnapshotNews stores one cached news headline returned by the SQLite snapshot route.
 type SnapshotNews = {
+  cachedAt?: string | null;
   publishedAt?: string | null;
+  source?: string | null;
   sourceName?: string | null;
   summary?: string | null;
   title: string;
@@ -240,7 +242,9 @@ export function StockAnalyzer() {
       setSnapshot((currentSnapshot) => currentSnapshot ? {
         ...currentSnapshot,
         news: research.news.map((item) => ({
+          cachedAt: item.freshness?.fetchedAt,
           publishedAt: item.publishedAt,
+          source: item.source,
           sourceName: item.sourceName ?? item.source,
           summary: item.summary,
           title: item.title,
@@ -891,9 +895,14 @@ function SnapshotDrawer({
               </section>
 
               <section className="rounded-xl border bg-card/90 p-3">
-                <div className="flex items-center gap-2">
-                  <Newspaper className="size-4 text-primary" aria-hidden="true" />
-                  <h4 className="text-base font-semibold">Relevant News</h4>
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Newspaper className="size-4 text-primary" aria-hidden="true" />
+                    <h4 className="text-base font-semibold">Relevant News</h4>
+                  </div>
+                  <span className="rounded-full border bg-[#191929] px-2 py-1 font-mono text-[10px] text-muted-foreground">
+                    {research ? "provider refresh" : "sqlite cache"}
+                  </span>
                 </div>
                 <div className="mt-3 grid gap-2">
                   {snapshot?.news.length ? (
@@ -907,8 +916,15 @@ function SnapshotDrawer({
                       >
                         <span className="flex items-start justify-between gap-3">
                           <span className="min-w-0">
-                            <span className="block font-medium text-foreground">{item.title}</span>
-                            <span className="mt-1 block text-xs text-muted-foreground">{item.sourceName ?? "Cached news"}{item.publishedAt ? ` / ${formatShortDate(item.publishedAt)}` : ""}</span>
+                            <span className="flex flex-wrap items-start gap-2">
+                              <span className="min-w-0 flex-1 font-medium text-foreground">{item.title}</span>
+                              {item.source ? <SourceTag label={item.source} tone={item.source === "fmp" ? "positive" : "accent"} /> : null}
+                            </span>
+                            <span className="mt-1 block text-xs text-muted-foreground">
+                              {item.sourceName ?? "Cached news"}
+                              {item.publishedAt ? ` / published ${formatShortDate(item.publishedAt)}` : ""}
+                              {!item.publishedAt && item.cachedAt ? ` / cached ${formatShortDate(item.cachedAt)}` : ""}
+                            </span>
                           </span>
                           <ExternalLink className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
                         </span>
@@ -916,7 +932,9 @@ function SnapshotDrawer({
                     ))
                   ) : (
                     <p className="rounded-xl border bg-[#191929] p-3 text-sm text-muted-foreground">
-                      No cached news is saved for this ticker yet. News will appear here once a provider or RSS feed is configured and refreshed.
+                      {research
+                        ? "No FMP or RSS headlines were returned for this ticker. If FMP is configured, the free key may not include this endpoint or the ticker may have no recent articles."
+                        : "No cached news is saved for this ticker yet. Use Refresh Research after FMP_API_KEY is configured, or add an RSS template as a fallback."}
                     </p>
                   )}
                 </div>

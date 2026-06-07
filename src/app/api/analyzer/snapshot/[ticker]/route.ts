@@ -25,7 +25,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ tic
     ticker: scan.ticker,
   }));
   const news = getLatestNewsItems(normalizedTicker, 8).map((item) => ({
+    cachedAt: item.createdAt,
     publishedAt: item.publishedAt,
+    source: item.source,
     sourceName: item.sourceName,
     summary: item.summary,
     title: item.title,

@@ -14,14 +14,14 @@ The app is past the original Version 1.0 baseline and is currently tagged at `v1
 - Dividend matrix, dividend cards, payout charts, DRIP metrics, and historical payout popouts.
 - Paged/filterable transaction verification with mobile stacked cards.
 - Research-first stock analyzer with provider OHLC fallback handling, technical indicators, Graham/Buffett owner scoring, SQLite-backed watchlist mirroring, and saved scan snapshot drawer.
-- Isolated market-data provider resolver for future live stock price and dividend yield APIs.
+- Isolated market-data provider resolver with cached research quotes for dashboard prices and local dividend-yield fallback.
 - Isolated analyzer-data provider resolver for future live historical OHLC APIs.
 - Server-only external-data providers with SQLite cache, free-tier budgets, and `/api/research/[ticker]`.
 
 ## Data Sources
 
 - `Transaction_Log.csv`: Parsed dynamically on server-rendered routes for holdings, dividends, DRIP, transactions, and dashboard calculations.
-- Market prices/yields: Local placeholders only. The provider interface lives in `src/lib/market-data`.
+- Market prices/yields: Dashboard prices reuse cached research quotes when available and fall back to latest CSV prices. Dividend yields/PADI still use local trailing dividend math until a forward yield provider is connected.
 - Analyzer OHLC candles: Twelve Data cached provider candles when configured, with Alpha Vantage and deterministic local mock fallbacks. The provider interface lives in `src/lib/analyzer`. No external indicator API is used.
 - Analyzer value metrics: SEC annual fundamentals when configured, with deterministic local estimates as fallback.
 - Analyzer news: RSS news fallback is cached in SQLite; FMP stock news remains optional if the account plan supports it.

@@ -90,10 +90,12 @@ function buildFundamentalSnapshot(ticker: string, data: SecCompanyFactsResponse)
   const revenue = latestAnnualUsd(revenueFact);
   const [latestRevenue, priorRevenue] = latestAnnualUsdValues(revenueFact, 2);
   const revenueGrowth = latestRevenue !== undefined && priorRevenue ? (latestRevenue - priorRevenue) / Math.abs(priorRevenue) : undefined;
+  const netIncomeFact = gaap.NetIncomeLoss;
+  const annualNetIncomeValues = latestAnnualUsdValues(netIncomeFact, 5);
   const currentAssets = latestUsd(gaap.AssetsCurrent);
   const currentLiabilities = latestUsd(gaap.LiabilitiesCurrent);
   const grossProfit = latestAnnualUsd(gaap.GrossProfit);
-  const netIncome = latestAnnualUsd(gaap.NetIncomeLoss);
+  const netIncome = annualNetIncomeValues[0];
   const operatingIncome = latestAnnualUsd(gaap.OperatingIncomeLoss);
   const totalAssets = latestUsd(gaap.Assets);
   const totalLiabilities = latestUsd(gaap.Liabilities);
@@ -106,6 +108,7 @@ function buildFundamentalSnapshot(ticker: string, data: SecCompanyFactsResponse)
   const bookValuePerShare = shareholderEquity !== undefined && sharesOutstanding ? shareholderEquity / sharesOutstanding : undefined;
   const returnOnEquity = netIncome !== undefined && shareholderEquity ? netIncome / shareholderEquity : undefined;
   const debtToEquity = longTermDebt !== undefined && shareholderEquity ? longTermDebt / shareholderEquity : undefined;
+  const earningsStability = calculateEarningsStability(annualNetIncomeValues);
 
   return {
     bookValuePerShare,
@@ -113,6 +116,7 @@ function buildFundamentalSnapshot(ticker: string, data: SecCompanyFactsResponse)
     currentAssets,
     currentLiabilities,
     debtToEquity,
+    earningsStability,
     freeCashFlow,
     grossProfit,
     longTermDebt,
@@ -212,6 +216,24 @@ function isAnnualDuration(row: SecFactRow) {
 // annualFactKey deduplicates annual rows that share the same fiscal year or period end.
 function annualFactKey(row: SecFactRow) {
   return row.fy !== undefined ? `${row.fy}` : row.end ?? "";
+}
+
+// calculateEarningsStability converts multi-year net income history into a 0-1 consistency score.
+function calculateEarningsStability(values: number[]) {
+  if (values.length < 3) {
+    return undefined;
+  }
+
+  const positiveRatio = values.filter((value) => value > 0).length / values.length;
+  const changes = values.slice(0, -1).map((value, index) => Math.abs(value - values[index + 1]) / Math.max(Math.abs(values[index + 1]), 1));
+  const averageChange = changes.reduce((total, value) => total + value, 0) / changes.length;
+
+  return clamp(positiveRatio - averageChange * 0.35, 0, 1);
+}
+
+// clamp limits derived SEC metrics to their expected display/scoring range.
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
 }
 
 // getSecHeaders provides the required SEC User-Agent contact string.

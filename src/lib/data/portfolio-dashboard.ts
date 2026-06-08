@@ -41,7 +41,7 @@ function buildMetricCards(summary: ReturnType<typeof buildPortfolioSummary>): Me
     {
       label: "Portfolio Value",
       fullTitle: "Total Portfolio Value",
-      description: "Estimated current market value of open holdings from the CSV, using placeholder prices until live quotes are connected.",
+      description: "Estimated current market value of open holdings from the CSV, using cached provider quotes where available and CSV fallback prices otherwise.",
       value: formatCurrency(summary.totalPortfolioValue),
       delta: `${formatSignedPercent(summary.totalProfitLossPercent)} P/L`,
       tone: summary.totalProfitLoss >= 0 ? "positive" : "warning",
@@ -50,7 +50,7 @@ function buildMetricCards(summary: ReturnType<typeof buildPortfolioSummary>): Me
     {
       label: "Total P/L",
       fullTitle: "Total Profit / Loss",
-      description: "Estimated unrealized gain or loss for open holdings: current placeholder market value minus calculated cost basis.",
+      description: "Estimated unrealized gain or loss for open holdings: current cached/provider market value minus calculated cost basis.",
       value: formatSignedCurrency(summary.totalProfitLoss),
       delta: formatSignedPercent(summary.totalProfitLossPercent),
       tone: summary.totalProfitLoss >= 0 ? "positive" : "warning",

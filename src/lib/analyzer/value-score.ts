@@ -112,6 +112,7 @@ function buildScoringFundamentals({ candles, dividendYield, fundamentals, price,
     fundamentals.returnOnEquity ?? safeDivide(fundamentals.netIncome, fundamentals.shareholderEquity),
     fallback.returnOnEquity,
   );
+  const earningsStabilityResult = chooseFundamental(fundamentals.earningsStability, fallback.earningsStability);
   const freeCashFlowPerShare = safeDivide(fundamentals.freeCashFlow, fundamentals.sharesOutstanding);
   const freeCashFlowYieldResult = chooseFundamental(freeCashFlowPerShare !== undefined ? freeCashFlowPerShare / Math.max(price, 1) : undefined, fallback.freeCashFlowYield);
   const grossMarginResult = chooseFundamental(safeDivide(fundamentals.grossProfit, fundamentals.revenue), fallback.grossMargin);
@@ -124,6 +125,7 @@ function buildScoringFundamentals({ candles, dividendYield, fundamentals, price,
     currentRatioResult,
     debtToEquityResult,
     returnOnEquityResult,
+    earningsStabilityResult,
     freeCashFlowYieldResult,
     grossMarginResult,
     operatingMarginResult,
@@ -136,6 +138,7 @@ function buildScoringFundamentals({ candles, dividendYield, fundamentals, price,
     currentRatio: currentRatioResult.value,
     dataConfidence,
     debtToEquity: debtToEquityResult.value,
+    earningsStability: earningsStabilityResult.value,
     eps: epsResult.value,
     freeCashFlowYield: freeCashFlowYieldResult.value,
     grossMargin: grossMarginResult.value,
@@ -191,7 +194,7 @@ function buildGrahamScore(fundamentals: ScoringFundamentals): ValueScore {
     }),
     buildMetric({
       description: "Stable earnings reduce the chance that today's cheap price is hiding a deteriorating business.",
-      formula: withSource("Earnings stability = local price-history volatility proxy until multi-year earnings data is stored", fundamentals),
+      formula: withSource("Earnings stability = multi-year annual net income consistency when SEC data exists; otherwise local price-history volatility proxy", fundamentals),
       label: "Earnings Stability",
       maxPoints: 10,
       points: Math.round(fundamentals.earningsStability * 10),

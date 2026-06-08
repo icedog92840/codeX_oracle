@@ -34,7 +34,7 @@ This file preserves the current project state for future Codex turns if chat con
 - Initial `/drip` implementation now reads the CSV and compares DRIP-active vs no-DRIP compounding.
 - `/drip` browser verification confirmed two SVG curves, point markers, year-span slider, metrics, and ticker options render.
 - `/drip` was polished with projection assumptions, terminal DRIP/no-DRIP values, terminal gap, one projected boundary marker, and a default view that includes projected years.
-- Market data is isolated behind `src/lib/market-data/market-data-provider.ts`; the current provider is local-only and keeps TODO placeholders for future live stock prices and dividend yields.
+- Market data is isolated behind `src/lib/market-data/market-data-provider.ts`; dashboard prices reuse cached research quotes when available and fall back to latest CSV prices. Dividend yields/PADI still use local trailing dividend math.
 - Visual QA found and fixed small-screen table compression by giving the dividend matrix and transaction table themed horizontal scrolling on narrow screens.
 - Visual QA found and fixed small-screen DRIP metric clipping by stacking metric label/value rows on mobile.
 - Mobile layout now avoids table-style horizontal scanning:
@@ -55,7 +55,7 @@ This file preserves the current project state for future Codex turns if chat con
 - Analyzer data now resolves through `src/lib/analyzer/analyzer-data-resolver.ts` and `analyzer-data-settings.ts`.
 - The active analyzer provider is `research`; it prefers cached `/api/research` OHLC data and falls back to deterministic mock candles when provider keys are missing or provider candles are unusable.
 - Market data now resolves through `src/lib/market-data/market-data-resolver.ts` and `market-data-settings.ts`.
-- The active provider remains `local-placeholder`; selecting `live` intentionally errors until a real provider is connected.
+- The active dashboard market-data provider is `live`, but it is cache-first: it reads provider quotes already stored in SQLite and falls back to local CSV prices without making dashboard-triggered API calls.
 - External live-data scaffolding now lives under `src/lib/external-data`:
   - SQLite database in `.data/codex-oracle.db`.
   - Provider cache responses and API-budget counters stored in SQLite.
@@ -74,6 +74,7 @@ This file preserves the current project state for future Codex turns if chat con
   - SEC EDGAR fundamentals work and now use annual-duration facts for income, cash flow, and revenue growth.
   - RSS news works and caches headline payloads in SQLite.
   - Analyzer UI has been manually confirmed to show provider OHLC instead of mock fallback.
+  - Dashboard AAPL holding was manually confirmed to use cached Twelve Data quote pricing after a research scan.
 - Mobile dividend payout chart tooltip overflow was fixed by making first/last bar popovers align inward.
 
 ## Stable Reference Tags

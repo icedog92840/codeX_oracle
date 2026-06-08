@@ -6,8 +6,8 @@ export type MarketDataSettings = {
   liveProviderName: string;
 };
 
-// marketDataSettings keeps the app local-first until a live quote provider is intentionally connected.
+// marketDataSettings reuses cached research quotes first while preserving local CSV fallbacks.
 export const marketDataSettings: MarketDataSettings = {
-  activeSource: "local-placeholder",
-  liveProviderName: "not-configured",
+  activeSource: "live",
+  liveProviderName: "research-quote-cache",
 };

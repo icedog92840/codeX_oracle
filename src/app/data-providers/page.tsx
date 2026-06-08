@@ -38,12 +38,12 @@ export default function DataProvidersPage() {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 className="text-base font-semibold">Active Data Routing</h2>
-              <p className="mt-1 text-xs leading-5 text-muted-foreground">This shows what the app will try first today, before any provider keys are added.</p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">This shows what the app tries first today while still keeping CSV fallbacks available.</p>
             </div>
             <span className="rounded-full border border-primary/40 bg-primary/10 px-2 py-1 font-mono text-[10px] text-primary">local-first</span>
           </div>
           <div className="mt-3 grid gap-2 sm:grid-cols-3">
-            <RoutingMetric label="Dashboard prices" value={formatSourceName(marketDataSettings.activeSource)} detail="Current share price and PADI still use the local market-data provider placeholder." />
+            <RoutingMetric label="Dashboard prices" value={formatSourceName(marketDataSettings.activeSource)} detail="Current share prices reuse cached research quotes when available; PADI still uses local trailing dividend math." />
             <RoutingMetric label="Analyzer candles" value={analyzerMode} detail={`${analyzerDataSettings.candleLookbackDays} daily candles through /api/research first, with mock fallback.`} />
             <RoutingMetric label="Secrets" value="Server only" detail="API keys are read from local env and never sent to browser components." />
           </div>

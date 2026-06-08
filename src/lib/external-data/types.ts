@@ -68,6 +68,7 @@ export type FundamentalSnapshot = {
   bookValuePerShare?: number;
   returnOnEquity?: number;
   debtToEquity?: number;
+  earningsStability?: number;
   freshness?: SourceFreshness;
   source: ExternalDataSource;
 };

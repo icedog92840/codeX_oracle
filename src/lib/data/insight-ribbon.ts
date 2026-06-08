@@ -160,15 +160,15 @@ export function getInsightRibbonData(): InsightRibbonData {
       },
       {
         label: "Market Prices",
-        value: marketData.source === "local-placeholder" ? "Local placeholders" : "Live provider",
-        detail: "Current prices use the isolated market-data provider. Today it remains local-only and estimates quotes from the latest known CSV prices.",
+        value: marketData.source === "local-placeholder" ? "CSV fallback" : "Cached quotes",
+        detail: "Dashboard prices use cached research quotes from SQLite when available and fall back to latest known CSV transaction prices for tickers without cached quotes.",
         tone: marketData.source === "local-placeholder" ? "warning" : "positive",
       },
       {
         label: "Dividend Yields",
-        value: marketData.source === "local-placeholder" ? "Estimated locally" : "Live provider",
+        value: "Estimated locally",
         detail: "PADI and yield context use local trailing dividend math until a live forward dividend yield provider is connected.",
-        tone: marketData.source === "local-placeholder" ? "warning" : "positive",
+        tone: "warning",
       },
       {
         label: "Analyzer Feed",

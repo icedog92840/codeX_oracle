@@ -198,9 +198,15 @@ function ProviderCard({ provider }: { provider: ProviderStatus }) {
 
       <p className="mt-3 text-xs leading-5 text-muted-foreground">{provider.detail}</p>
 
-      <div className="mt-3 grid grid-cols-3 gap-2">
+      <div className="mt-3 rounded-xl border border-primary/20 bg-primary/5 p-3">
+        <p className="text-xs font-semibold uppercase text-primary">Current App Role</p>
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">{provider.appRole}</p>
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
         <MiniMetric label="Cache" value={provider.cacheLabel} />
-        <MiniMetric label="Fresh/Stale" value={`${provider.cacheFreshEntries}/${provider.cacheStaleEntries}`} />
+        <MiniMetric label="Health" value={provider.cacheEntries ? `${provider.cacheHealthPercent}% fresh` : "No cache"} />
+        <MiniMetric label="Latest" value={provider.latestCacheFetchLabel} />
         <MiniMetric label="Limit" value={provider.quota} />
       </div>
 
@@ -220,6 +226,38 @@ function ProviderCard({ provider }: { provider: ProviderStatus }) {
           >
             {provider.usage}
           </span>
+        </div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <UsageBar label="Minute" percent={provider.minuteUsagePercent} tone={provider.usageTone} />
+          <UsageBar label="Day" percent={provider.dayUsagePercent} tone={provider.usageTone} />
+        </div>
+      </div>
+
+      <div className="mt-3 rounded-xl border bg-[#191929] p-3">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <p className="text-xs font-semibold uppercase text-primary">Cache Inventory</p>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">Grouped by endpoint so stale quotes, candles, news, or fundamentals can be spotted quickly.</p>
+          </div>
+          <span className={cn("rounded-full border px-2 py-1 font-mono text-[10px]", provider.cacheEntries ? "border-primary/40 text-primary" : "border-slate-400/25 text-muted-foreground")}>
+            {provider.cacheEntries} records
+          </span>
+        </div>
+        <div className="mt-3 grid gap-2">
+          {provider.cacheBreakdown.length ? (
+            provider.cacheBreakdown.map((item) => (
+              <CacheInventoryRow
+                freshEntries={item.freshEntries}
+                key={item.cacheKeyPrefix}
+                label={item.label}
+                latestFetchLabel={item.latestFetchLabel}
+                staleEntries={item.staleEntries}
+                totalEntries={item.totalEntries}
+              />
+            ))
+          ) : (
+            <p className="rounded-lg border border-dashed border-border/70 px-3 py-2 text-xs text-muted-foreground">No local cache records for this provider yet.</p>
+          )}
         </div>
       </div>
 
@@ -246,6 +284,71 @@ function ProviderCard({ provider }: { provider: ProviderStatus }) {
         </div>
       </div>
     </article>
+  );
+}
+
+// UsageBar renders one compact budget usage meter without exposing API keys.
+function UsageBar({
+  label,
+  percent,
+  tone,
+}: {
+  label: string;
+  percent: number;
+  tone: ProviderStatus["usageTone"];
+}) {
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-2 text-[10px] uppercase text-muted-foreground">
+        <span>{label}</span>
+        <span className="font-mono">{percent}%</span>
+      </div>
+      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-[#11111f]">
+        <div
+          className={cn(
+            "h-full rounded-full transition-all",
+            tone === "positive" && "bg-emerald-300/70",
+            tone === "accent" && "bg-primary/80",
+            tone === "warning" && "bg-amber-200/80",
+          )}
+          style={{ width: `${percent}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+// CacheInventoryRow shows the cache status for one provider endpoint.
+function CacheInventoryRow({
+  freshEntries,
+  label,
+  latestFetchLabel,
+  staleEntries,
+  totalEntries,
+}: {
+  freshEntries: number;
+  label: string;
+  latestFetchLabel: string;
+  staleEntries: number;
+  totalEntries: number;
+}) {
+  const freshPercent = totalEntries > 0 ? Math.round((freshEntries / totalEntries) * 100) : 0;
+
+  return (
+    <div className="rounded-lg border bg-[#151525] px-3 py-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
+          <p className="truncate text-xs font-semibold">{label}</p>
+          <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">{latestFetchLabel}</p>
+        </div>
+        <span className={cn("rounded-full border px-2 py-1 font-mono text-[10px]", staleEntries ? "border-amber-200/30 text-amber-200" : "border-emerald-300/30 text-emerald-300")}>
+          {freshEntries}/{totalEntries} fresh
+        </span>
+      </div>
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#11111f]">
+        <div className={cn("h-full rounded-full transition-all", staleEntries ? "bg-amber-200/80" : "bg-emerald-300/70")} style={{ width: `${freshPercent}%` }} />
+      </div>
+    </div>
   );
 }
 

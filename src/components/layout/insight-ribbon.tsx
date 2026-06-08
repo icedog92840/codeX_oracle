@@ -1,15 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
-import { BarChart3, ChevronRight, Database, Pause, Sparkles, X } from "lucide-react";
-import type { InsightChip, InsightDataStatusItem, InsightRibbonData, InsightRoutePayload } from "@/lib/data/insight-ribbon";
+import { BarChart3, Database, Pause, X } from "lucide-react";
+import type { BriefingItem, InsightChip, InsightDataStatusItem, InsightRibbonData, InsightRoutePayload } from "@/lib/data/insight-ribbon";
 import type { ProviderStatus } from "@/lib/data/provider-status";
 import { cn } from "@/lib/utils";
 
 // InsightRibbon replaces the old search placeholder with page-aware local portfolio context.
 export function InsightRibbon({ data }: { data: InsightRibbonData }) {
-  const [activeIndex, setActiveIndex] = useState(0);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isDataOpen, setIsDataOpen] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -20,20 +19,6 @@ export function InsightRibbon({ data }: { data: InsightRibbonData }) {
     [analyzerStorageSnapshot, pathname],
   );
   const routePayload = useMemo(() => getRoutePayload(pathname, data, analyzerSnapshot), [analyzerSnapshot, data, pathname]);
-  const rotationItems = useMemo(() => buildRotationItems(routePayload, data.principles), [data.principles, routePayload]);
-  const activeItem = rotationItems[activeIndex % rotationItems.length];
-
-  useEffect(() => {
-    if (isPaused || isExpanded) {
-      return;
-    }
-
-    const interval = window.setInterval(() => {
-      setActiveIndex((currentIndex) => (currentIndex + 1) % rotationItems.length);
-    }, 8000);
-
-    return () => window.clearInterval(interval);
-  }, [isExpanded, isPaused, rotationItems.length]);
 
   return (
     <section
@@ -60,7 +45,7 @@ export function InsightRibbon({ data }: { data: InsightRibbonData }) {
 
         <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-2">
           <button
-            className="relative min-w-0 rounded-xl border bg-[#191929]/80 px-3 py-2 text-left outline-none transition-colors hover:border-primary/50 hover:bg-[#202034] focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/35"
+            className="relative min-w-0 overflow-hidden rounded-xl border bg-[#191929]/80 px-3 py-2 text-left outline-none transition-colors hover:border-primary/50 hover:bg-[#202034] focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/35"
             onClick={() => {
               setIsDataOpen(false);
               setIsExpanded(true);
@@ -69,17 +54,9 @@ export function InsightRibbon({ data }: { data: InsightRibbonData }) {
             aria-expanded={isExpanded}
             aria-label="Open full portfolio briefing"
           >
-            <div className="flex min-w-0 items-center gap-2">
-              {activeItem.type === "principle" ? (
-                <Sparkles className="size-3.5 shrink-0 text-accent-foreground" aria-hidden="true" />
-              ) : (
-                <ChevronRight className="size-3.5 shrink-0 text-primary" aria-hidden="true" />
-              )}
-              <p key={`${pathname}-${activeIndex}`} className="insight-slide min-w-0 truncate text-xs text-muted-foreground md:text-sm">
-                <span className="font-medium text-foreground">{activeItem.label}</span>
-                <span className="mx-1.5 text-border">/</span>
-                {activeItem.text}
-              </p>
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="shrink-0 text-[10px] font-semibold uppercase text-primary">Briefing</span>
+              <BriefingMarquee items={routePayload.briefingItems} isPaused={isPaused || isExpanded} />
               {isPaused ? <Pause className="ml-auto hidden size-3 shrink-0 text-muted-foreground md:block" aria-hidden="true" /> : null}
             </div>
           </button>
@@ -107,20 +84,17 @@ export function InsightRibbon({ data }: { data: InsightRibbonData }) {
         <div className="absolute inset-x-0 top-0 z-40 rounded-2xl border bg-[#191929]/98 p-3 shadow-[0_22px_60px_rgba(0,0,0,0.48)] ring-1 ring-primary/15 backdrop-blur">
           <div className="flex items-start gap-3">
             <div className="soft-pulse mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl border bg-secondary text-primary">
-              {activeItem.type === "principle" ? <Sparkles className="size-4" aria-hidden="true" /> : <ChevronRight className="size-4" aria-hidden="true" />}
+              <BarChart3 className="size-4" aria-hidden="true" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold uppercase text-primary">{activeItem.label}</p>
-              <p className="mt-1 text-sm leading-6 text-foreground">{activeItem.text}</p>
+              <p className="text-xs font-semibold uppercase text-primary">Briefing</p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                {routePayload.briefingItems.map((item) => (
+                  <BriefingExpandedCard key={`${item.label}-${item.value}`} item={item} />
+                ))}
+              </div>
             </div>
             <div className="flex shrink-0 items-center gap-1">
-              <button
-                className="rounded-xl border px-3 py-2 text-xs text-muted-foreground transition-colors hover:border-primary/60 hover:text-foreground"
-                onClick={() => setActiveIndex((currentIndex) => (currentIndex + 1) % rotationItems.length)}
-                type="button"
-              >
-                Next
-              </button>
               <button
                 className="rounded-xl border p-2 text-muted-foreground transition-colors hover:border-primary/60 hover:text-foreground"
                 onClick={() => setIsExpanded(false)}
@@ -140,6 +114,69 @@ export function InsightRibbon({ data }: { data: InsightRibbonData }) {
       <div className="insight-hairline absolute inset-x-0 bottom-0 h-px" />
     </section>
   );
+}
+
+// BriefingMarquee renders leaderboard-style stats as a slow right-to-left ticker.
+function BriefingMarquee({ isPaused, items }: { isPaused: boolean; items: BriefingItem[] }) {
+  const loopItems = items.length ? items : [{ label: "Briefing", value: "No local stats available", tone: "neutral" as const }];
+
+  return (
+    <div className="relative min-w-0 flex-1 overflow-hidden">
+      <div className={cn("briefing-marquee-track flex w-max items-center gap-3", isPaused && "briefing-marquee-paused")}>
+        <BriefingMarqueeSet items={loopItems} />
+        <BriefingMarqueeSet ariaHidden items={loopItems} />
+      </div>
+      <div className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-[linear-gradient(90deg,#191929,rgba(25,25,41,0))]" />
+      <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-[linear-gradient(270deg,#191929,rgba(25,25,41,0))]" />
+    </div>
+  );
+}
+
+// BriefingMarqueeSet renders one duplicated sequence used by the seamless marquee loop.
+function BriefingMarqueeSet({ ariaHidden = false, items }: { ariaHidden?: boolean; items: BriefingItem[] }) {
+  return (
+    <div aria-hidden={ariaHidden} className="flex items-center gap-3 pr-3">
+      {items.map((item) => (
+        <span key={`${item.label}-${item.value}`} className="inline-flex items-center gap-1.5 whitespace-nowrap font-mono text-xs">
+          <span className="text-[10px] font-semibold uppercase text-muted-foreground">{item.label}</span>
+          <span className={cn("font-bold", briefingToneClass(item.tone))}>{item.value}</span>
+          <span className="text-border">•</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+// BriefingExpandedCard renders one full briefing item when the marquee is opened.
+function BriefingExpandedCard({ item }: { item: BriefingItem }) {
+  return (
+    <div className="rounded-xl border bg-[#202034]/75 p-3">
+      <p className="text-[10px] uppercase text-muted-foreground">{item.label}</p>
+      <p className={cn("mt-1 truncate font-mono text-sm font-bold", briefingToneClass(item.tone))}>{item.value}</p>
+      {item.detail ? <p className="mt-2 text-xs leading-5 text-muted-foreground">{item.detail}</p> : null}
+    </div>
+  );
+}
+
+// briefingToneClass maps briefing stat intent to the premium finance color language.
+function briefingToneClass(tone: BriefingItem["tone"]) {
+  if (tone === "accent") {
+    return "text-primary";
+  }
+
+  if (tone === "negative") {
+    return "text-rose-300";
+  }
+
+  if (tone === "positive") {
+    return "text-emerald-300";
+  }
+
+  if (tone === "warning") {
+    return "text-amber-200";
+  }
+
+  return "text-foreground";
 }
 
 // DataStatusPanel explains which app values are CSV-backed, placeholder-backed, or provider-backed.
@@ -240,6 +277,7 @@ function DataStatusCard({ item }: { item: InsightDataStatusItem }) {
           className={cn(
             "shrink-0 rounded-full border px-2 py-0.5 font-mono text-[10px]",
             item.tone === "accent" && "border-primary/40 text-primary",
+            item.tone === "negative" && "border-rose-300/30 text-rose-300",
             item.tone === "positive" && "border-emerald-300/30 text-emerald-300",
             item.tone === "warning" && "border-amber-200/30 text-amber-200",
             (!item.tone || item.tone === "neutral") && "border-border text-muted-foreground",
@@ -262,6 +300,7 @@ function InsightChipPill({ chip }: { chip: InsightChip }) {
         className={cn(
           "mt-0.5 truncate font-mono text-xs font-semibold",
           chip.tone === "accent" && "text-primary",
+          chip.tone === "negative" && "text-rose-300",
           chip.tone === "positive" && "text-emerald-300",
           chip.tone === "warning" && "text-amber-200",
           (!chip.tone || chip.tone === "neutral") && "text-foreground",
@@ -296,14 +335,6 @@ function getRoutePayload(pathname: string, data: InsightRibbonData, analyzerSnap
   }
 
   return data.dashboard;
-}
-
-// buildRotationItems mixes route-specific briefings with investing principles.
-function buildRotationItems(routePayload: InsightRoutePayload, principles: string[]) {
-  return [
-    ...routePayload.briefings.map((text) => ({ label: "Briefing", text, type: "briefing" as const })),
-    ...principles.map((text) => ({ label: "Principle", text, type: "principle" as const })),
-  ];
 }
 
 // subscribeAnalyzerStorage lets the ribbon react when saved Analyzer data changes in this browser.
@@ -349,6 +380,12 @@ function readAnalyzerSnapshot(storageSnapshot: string): InsightRoutePayload | nu
     const lastScan = recentScans[0];
 
     return {
+      briefingItems: [
+        { label: "Watchlist", value: String(watchlist.length), tone: "accent" },
+        { label: "Highest Grade", value: bestSaved ? `${bestSaved.ticker ?? "-"} ${bestSaved.grade ?? "-"} / ${bestSaved.score ?? "-"}` : "-", tone: bestSaved ? "positive" : "neutral" },
+        { label: "Recent Scan", value: lastScan?.ticker ?? "-", tone: "neutral" },
+        { label: "Feed", value: "Offline", tone: "warning" },
+      ],
       chips: [
         { label: "Watchlist", value: String(watchlist.length), tone: "accent" },
         { label: "Best Grade", value: bestSaved ? `${bestSaved.ticker ?? "-"} ${bestSaved.grade ?? "-"}` : "-", tone: "positive" },

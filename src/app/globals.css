@@ -129,6 +129,14 @@ a {
   background-size: 220% 100%;
 }
 
+.briefing-marquee-track {
+  animation: briefing-marquee 32s linear infinite;
+}
+
+.briefing-marquee-paused {
+  animation-play-state: paused;
+}
+
 .soft-pulse {
   position: relative;
 }
@@ -168,9 +176,20 @@ a {
   }
 }
 
+@keyframes briefing-marquee {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(-50%);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .insight-slide,
   .insight-hairline,
+  .briefing-marquee-track,
   .soft-pulse::after {
     animation: none;
   }

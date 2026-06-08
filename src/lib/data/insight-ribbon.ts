@@ -12,11 +12,23 @@ import type { NormalizedTransaction } from "@/lib/types/transactions";
 export type InsightChip = {
   label: string;
   value: string;
-  tone?: "accent" | "positive" | "neutral" | "warning";
+  tone?: InsightTone;
 };
 
-// InsightRoutePayload stores the chips and rotating briefing lines for one route.
+// InsightTone keeps chip and briefing color intent consistent across the ribbon.
+export type InsightTone = "accent" | "negative" | "positive" | "neutral" | "warning";
+
+// BriefingItem stores one bold, ticker-like leaderboard stat for the top marquee.
+export type BriefingItem = {
+  detail?: string;
+  label: string;
+  tone?: InsightTone;
+  value: string;
+};
+
+// InsightRoutePayload stores the chips, marquee stats, and expanded briefing lines for one route.
 export type InsightRoutePayload = {
+  briefingItems: BriefingItem[];
   chips: InsightChip[];
   briefings: string[];
 };
@@ -26,7 +38,7 @@ export type InsightDataStatusItem = {
   label: string;
   value: string;
   detail: string;
-  tone?: "accent" | "positive" | "neutral" | "warning";
+  tone?: InsightTone;
 };
 
 // InsightRibbonData stores every route's ribbon content plus shared investing principles.
@@ -55,6 +67,9 @@ export function getInsightRibbonData(): InsightRibbonData {
   const allTimeDividendTotal = sumAmounts(dividendTransactions);
   const latestYearDividendTotal = sumAmounts(latestYearDividends);
   const topHolding = holdings.slice().sort((left, right) => right.marketValue - left.marketValue)[0];
+  const bestPerformer = holdings.slice().sort((left, right) => right.profitLoss - left.profitLoss)[0];
+  const worstPerformer = holdings.slice().sort((left, right) => left.profitLoss - right.profitLoss)[0];
+  const quoteHealth = buildQuoteHealth(holdings);
   const topPayer = getTopDividendPayer(dividendTransactions);
   const strongestMonth = getStrongestDividendMonth(latestYearDividends);
   const transactionStats = buildTransactionStats(transactions);
@@ -65,9 +80,28 @@ export function getInsightRibbonData(): InsightRibbonData {
   const readyProviders = providerStatus.filter((provider) => provider.enabled).length;
   const totalProviderCacheEntries = providerStatus.reduce((total, provider) => total + provider.cacheEntries, 0);
   const nextMissingProvider = providerStatus.find((provider) => !provider.enabled);
+  const commonBriefingItems: BriefingItem[] = [
+    { label: "Portfolio Value", value: formatCurrency(summary.totalPortfolioValue), tone: "accent" },
+    { label: "Total P/L", value: formatSignedCurrency(summary.totalProfitLoss), tone: summary.totalProfitLoss >= 0 ? "positive" : "negative" },
+    { label: "Dividends Paid", value: formatCurrency(summary.totalDividendsPaid), tone: "positive" },
+    { label: "PADI", value: formatCurrency(summary.projectedAnnualDividendIncome), tone: "positive" },
+    { label: "Weekly Income", value: formatCurrency(summary.projectedAnnualDividendIncome / 52), tone: "positive" },
+    { label: "Monthly Income", value: formatCurrency(summary.projectedAnnualDividendIncome / 12), tone: "positive" },
+    { label: "Largest Position", value: topHolding ? `${topHolding.ticker} ${formatPercent(topHolding.weight)}` : "-", tone: "accent" },
+    { label: "Best Performer", value: bestPerformer ? `${bestPerformer.ticker} ${formatSignedCurrency(bestPerformer.profitLoss)}` : "-", tone: bestPerformer && bestPerformer.profitLoss >= 0 ? "positive" : "negative" },
+    { label: "Highest Div Month", value: `${strongestMonth.label} ${formatCurrency(strongestMonth.total)}`, tone: "positive" },
+    { label: "Top Dividend Payer", value: `${topPayer.ticker} ${formatCurrency(topPayer.total)}`, tone: "positive" },
+    { label: "Fresh Quotes", value: String(quoteHealth.fresh + quoteHealth.good), tone: "positive" },
+    { label: "Stale/Fallback", value: String(quoteHealth.aging + quoteHealth.stale + quoteHealth.fallback), tone: quoteHealth.aging + quoteHealth.stale + quoteHealth.fallback > 0 ? "warning" : "positive" },
+  ];
 
   return {
     dashboard: {
+      briefingItems: [
+        ...commonBriefingItems,
+        { label: "Worst Performer", value: worstPerformer ? `${worstPerformer.ticker} ${formatSignedCurrency(worstPerformer.profitLoss)}` : "-", tone: worstPerformer && worstPerformer.profitLoss < 0 ? "negative" : "neutral" },
+        { label: "Open Holdings", value: String(holdings.length), tone: "accent" },
+      ],
       chips: [
         { label: "Holdings", value: String(holdings.length), tone: "accent" },
         { label: "Dividends", value: formatCurrency(summary.totalDividendsPaid), tone: "positive" },
@@ -81,6 +115,14 @@ export function getInsightRibbonData(): InsightRibbonData {
       ],
     },
     dividends: {
+      briefingItems: [
+        { label: "Highest Div Month", value: `${strongestMonth.label} ${formatCurrency(strongestMonth.total)}`, tone: "positive" },
+        { label: "Weekly Income", value: formatCurrency(summary.projectedAnnualDividendIncome / 52), tone: "positive" },
+        { label: "Monthly Income", value: formatCurrency(summary.projectedAnnualDividendIncome / 12), tone: "positive" },
+        { label: "Top Dividend Payer", value: `${topPayer.ticker} ${formatCurrency(topPayer.total)}`, tone: "positive" },
+        { label: "All-Time Dividends", value: formatCurrency(allTimeDividendTotal), tone: "positive" },
+        { label: "Latest Year Pace", value: formatCurrency(latestYearDividendTotal), tone: "accent" },
+      ],
       chips: [
         { label: "Daily Avg", value: formatCurrency(latestYearDividendTotal / 365), tone: "positive" },
         { label: "Weekly Avg", value: formatCurrency(latestYearDividendTotal / 52), tone: "positive" },
@@ -94,6 +136,13 @@ export function getInsightRibbonData(): InsightRibbonData {
       ],
     },
     transactions: {
+      briefingItems: [
+        { label: "CSV Rows", value: transactions.length.toLocaleString(), tone: "accent" },
+        { label: "Most Active", value: transactionStats.mostActiveTicker, tone: "accent" },
+        { label: "Largest Cash Event", value: formatCurrency(transactionStats.largestCashAmount), tone: "warning" },
+        { label: "Open Holdings", value: String(holdings.length), tone: "positive" },
+        { label: "Last CSV Date", value: transactionStats.lastDate, tone: "neutral" },
+      ],
       chips: [
         { label: "Rows", value: transactions.length.toLocaleString(), tone: "accent" },
         { label: "Last Row", value: transactionStats.lastDate, tone: "neutral" },
@@ -107,6 +156,13 @@ export function getInsightRibbonData(): InsightRibbonData {
       ],
     },
     drip: {
+      briefingItems: [
+        { label: "DRIP Shares", value: formatShares(dripStats.totalDripShares), tone: "positive" },
+        { label: "Best DRIP", value: dripStats.bestDripTicker, tone: "accent" },
+        { label: "Best YOC", value: formatPercent(dripStats.highestYieldOnCost), tone: "positive" },
+        { label: "DRIP Assets", value: String(dripStats.dripAssetCount), tone: "neutral" },
+        { label: "Top Dividend Payer", value: `${topPayer.ticker} ${formatCurrency(topPayer.total)}`, tone: "positive" },
+      ],
       chips: [
         { label: "DRIP Shares", value: formatShares(dripStats.totalDripShares), tone: "positive" },
         { label: "Best DRIP", value: dripStats.bestDripTicker, tone: "accent" },
@@ -120,6 +176,13 @@ export function getInsightRibbonData(): InsightRibbonData {
       ],
     },
     analyzer: {
+      briefingItems: [
+        { label: "Analyzer Mode", value: analyzerModeLabel, tone: "accent" },
+        { label: "Feed", value: analyzerFeedLabel, tone: analyzerDataSettings.activeSource === "mock" ? "warning" : "positive" },
+        { label: "Indicators", value: "SMA RSI MACD", tone: "neutral" },
+        { label: "Watchlist", value: "Browser + SQLite", tone: "accent" },
+        { label: "Scoring", value: "Graham + Buffett", tone: "positive" },
+      ],
       chips: [
         { label: "Local Mode", value: analyzerModeLabel, tone: "accent" },
         { label: "Indicators", value: "SMA RSI MACD", tone: "neutral" },
@@ -133,6 +196,13 @@ export function getInsightRibbonData(): InsightRibbonData {
       ],
     },
     dataProviders: {
+      briefingItems: [
+        { label: "Providers Ready", value: `${readyProviders}/${providerStatus.length}`, tone: readyProviders > 0 ? "positive" : "warning" },
+        { label: "Cache Records", value: String(totalProviderCacheEntries), tone: "accent" },
+        { label: "Next Key", value: nextMissingProvider?.missingEnv[0] ?? "Complete", tone: nextMissingProvider ? "warning" : "positive" },
+        { label: "Mode", value: "Offline Safe", tone: "neutral" },
+        { label: "Quote Cache", value: marketData.source === "local-placeholder" ? "Fallback" : "Cached", tone: marketData.source === "local-placeholder" ? "warning" : "positive" },
+      ],
       chips: [
         { label: "Ready", value: `${readyProviders}/${providerStatus.length}`, tone: readyProviders > 0 ? "positive" : "warning" },
         { label: "Cache", value: String(totalProviderCacheEntries), tone: "accent" },
@@ -179,6 +249,12 @@ export function getInsightRibbonData(): InsightRibbonData {
     ],
     providerStatus,
   };
+}
+
+// formatSignedCurrency renders positive and negative dollar values with an explicit sign.
+function formatSignedCurrency(value: number) {
+  const formatted = formatCurrency(Math.abs(value));
+  return `${value >= 0 ? "+" : "-"}${formatted}`;
 }
 
 // isCashDividend identifies Robinhood cash dividend rows.
@@ -229,6 +305,17 @@ function getStrongestDividendMonth(transactions: NormalizedTransaction[]) {
     label: new Intl.DateTimeFormat("en-US", { month: "long" }).format(new Date(2026, index, 1)),
     total: totals[index] ?? 0,
   };
+}
+
+// buildQuoteHealth counts cached quote freshness buckets for briefing stats.
+function buildQuoteHealth(holdings: ReturnType<typeof buildPortfolioHoldings>) {
+  return holdings.reduce(
+    (summary, holding) => {
+      summary[holding.quoteFreshness.status] += 1;
+      return summary;
+    },
+    { aging: 0, fallback: 0, fresh: 0, good: 0, stale: 0 },
+  );
 }
 
 // buildTransactionStats derives compact activity metrics from the CSV.

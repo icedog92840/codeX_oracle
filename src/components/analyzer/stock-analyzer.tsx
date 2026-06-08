@@ -257,15 +257,17 @@ export function StockAnalyzer() {
       setSnapshotRefreshResult(buildSnapshotRefreshResult(research));
       setSnapshot((currentSnapshot) => currentSnapshot ? {
         ...currentSnapshot,
-        news: research.news.map((item) => ({
-          cachedAt: item.freshness?.fetchedAt,
-          publishedAt: item.publishedAt,
-          source: item.source,
-          sourceName: item.sourceName ?? item.source,
-          summary: item.summary,
-          title: item.title,
-          url: item.url,
-        })),
+        news: research.news.length
+          ? research.news.map((item) => ({
+            cachedAt: item.freshness?.fetchedAt,
+            publishedAt: item.publishedAt,
+            source: item.source,
+            sourceName: item.sourceName ?? item.source,
+            summary: item.summary,
+            title: item.title,
+            url: item.url,
+          }))
+          : currentSnapshot.news,
       } : currentSnapshot);
     } catch {
       setSnapshotError("Research data could not be refreshed. Check provider settings in the Data panel.");
@@ -970,6 +972,7 @@ function SnapshotDrawer({
 }) {
   const latestScan = snapshot?.latestScan ?? null;
   const latestScorecard = latestScan?.metrics.valueScorecard ?? null;
+  const newsStatus = buildNewsDisplayStatus(snapshot?.news ?? [], research, refreshResult);
 
   return (
     <div className="fixed inset-0 z-50 bg-black/55 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label={`${ticker} saved scan snapshot`}>
@@ -1097,42 +1100,14 @@ function SnapshotDrawer({
                     <Newspaper className="size-4 text-primary" aria-hidden="true" />
                     <h4 className="text-base font-semibold">Relevant News</h4>
                   </div>
-                  <span className="rounded-full border bg-[#191929] px-2 py-1 font-mono text-[10px] text-muted-foreground">
-                    {research ? "provider refresh" : "sqlite cache"}
-                  </span>
+                  <SourceTag label={newsStatus.badgeLabel} tone={newsStatus.badgeTone} />
                 </div>
+                <NewsStatusPanel status={newsStatus} />
                 <div className="mt-3 grid gap-2">
                   {snapshot?.news.length ? (
-                    snapshot.news.map((item) => (
-                      <a
-                        key={item.url}
-                        className="rounded-xl border bg-[#191929] p-3 text-sm transition-colors hover:border-primary/60"
-                        href={item.url}
-                        rel="noreferrer"
-                        target="_blank"
-                      >
-                        <span className="flex items-start justify-between gap-3">
-                          <span className="min-w-0">
-                            <span className="flex flex-wrap items-start gap-2">
-                              <span className="min-w-0 flex-1 font-medium text-foreground">{item.title}</span>
-                              {item.source ? <SourceTag label={item.source} tone={item.source === "fmp" ? "positive" : "accent"} /> : null}
-                            </span>
-                            <span className="mt-1 block text-xs text-muted-foreground">
-                              {item.sourceName ?? "Cached news"}
-                              {item.publishedAt ? ` / published ${formatShortDate(item.publishedAt)}` : ""}
-                              {!item.publishedAt && item.cachedAt ? ` / cached ${formatShortDate(item.cachedAt)}` : ""}
-                            </span>
-                          </span>
-                          <ExternalLink className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-                        </span>
-                      </a>
-                    ))
+                    snapshot.news.map((item) => <NewsItemCard key={item.url} item={item} />)
                   ) : (
-                    <p className="rounded-xl border bg-[#191929] p-3 text-sm text-muted-foreground">
-                      {research
-                        ? "No FMP or RSS headlines were returned for this ticker. If FMP is configured, the free key may not include this endpoint or the ticker may have no recent articles."
-                        : "No cached news is saved for this ticker yet. Use Refresh Research after FMP_API_KEY is configured, or add an RSS template as a fallback."}
-                    </p>
+                    <NewsEmptyState hasRefreshed={Boolean(refreshResult)} />
                   )}
                 </div>
               </section>
@@ -1142,6 +1117,133 @@ function SnapshotDrawer({
       </div>
     </div>
   );
+}
+
+// NewsStatusPanel explains whether visible headlines are fresh provider results or cached fallback.
+function NewsStatusPanel({ status }: { status: ReturnType<typeof buildNewsDisplayStatus> }) {
+  return (
+    <div className="mt-3 rounded-xl border bg-[#191929] p-3">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase text-primary">{status.title}</p>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">{status.detail}</p>
+        </div>
+        <span className="rounded-full border border-border px-2 py-1 font-mono text-[10px] text-muted-foreground">
+          {status.countLabel}
+        </span>
+      </div>
+      {status.sources.length ? (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {status.sources.map((source) => (
+            <SourceTag key={source} label={source} tone={source === "fmp" ? "positive" : "accent"} />
+          ))}
+          {status.latestDate ? <SourceTag label={`Latest ${formatShortDate(status.latestDate)}`} tone="neutral" /> : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+// NewsItemCard renders one cached or freshly refreshed headline.
+function NewsItemCard({ item }: { item: SnapshotNews }) {
+  return (
+    <a
+      className="rounded-xl border bg-[#191929] p-3 text-sm transition-colors hover:border-primary/60"
+      href={item.url}
+      rel="noreferrer"
+      target="_blank"
+    >
+      <span className="flex items-start justify-between gap-3">
+        <span className="min-w-0">
+          <span className="flex flex-wrap items-start gap-2">
+            <span className="min-w-0 flex-1 font-medium text-foreground">{item.title}</span>
+            {item.source ? <SourceTag label={item.source} tone={item.source === "fmp" ? "positive" : "accent"} /> : null}
+          </span>
+          <span className="mt-1 block text-xs text-muted-foreground">
+            {item.sourceName ?? "Cached news"}
+            {item.publishedAt ? ` / published ${formatShortDate(item.publishedAt)}` : ""}
+            {!item.publishedAt && item.cachedAt ? ` / cached ${formatShortDate(item.cachedAt)}` : ""}
+          </span>
+          {item.summary ? <span className="mt-2 block line-clamp-2 text-xs leading-5 text-muted-foreground">{item.summary}</span> : null}
+        </span>
+        <ExternalLink className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+      </span>
+    </a>
+  );
+}
+
+// NewsEmptyState gives a useful explanation when no provider or cached headlines exist.
+function NewsEmptyState({ hasRefreshed }: { hasRefreshed: boolean }) {
+  return (
+    <div className="rounded-xl border border-dashed border-border/80 bg-[#191929] p-3 text-sm text-muted-foreground">
+      <p className="font-semibold text-foreground">No headlines available</p>
+      <p className="mt-1 text-xs leading-5">
+        {hasRefreshed
+          ? "The refresh completed, but no FMP or RSS headlines were returned. This can happen when the free FMP plan gates stock news, the ticker has no recent articles, or no RSS template is configured."
+          : "No cached SQLite headlines are saved for this ticker yet. Use Refresh Research after FMP or RSS is configured to populate this section."}
+      </p>
+    </div>
+  );
+}
+
+// buildNewsDisplayStatus creates the headline section summary from cache and refresh state.
+function buildNewsDisplayStatus(
+  news: SnapshotNews[],
+  research: StockResearchSnapshot | null,
+  refreshResult: SnapshotRefreshResult | null,
+) {
+  const sources = Array.from(new Set(news.map((item) => item.source).filter((source): source is string => Boolean(source))));
+  const latestDate = news
+    .map((item) => item.publishedAt ?? item.cachedAt)
+    .filter((value): value is string => Boolean(value))
+    .sort((left, right) => right.localeCompare(left))[0];
+  const providerHeadlineCount = research?.news.length ?? 0;
+
+  if (refreshResult && providerHeadlineCount === 0 && news.length > 0) {
+    return {
+      badgeLabel: "Cached fallback",
+      badgeTone: "warning" as const,
+      countLabel: `${news.length} cached`,
+      detail: "The latest provider refresh returned no headlines, so the drawer is keeping the existing SQLite news cache visible.",
+      latestDate,
+      sources,
+      title: "Showing Cached Headlines",
+    };
+  }
+
+  if (refreshResult && providerHeadlineCount > 0) {
+    return {
+      badgeLabel: "Provider refresh",
+      badgeTone: "positive" as const,
+      countLabel: `${providerHeadlineCount} refreshed`,
+      detail: "These headlines came from the latest research refresh and were saved back into SQLite for future snapshot opens.",
+      latestDate,
+      sources,
+      title: "Fresh News Loaded",
+    };
+  }
+
+  if (news.length > 0) {
+    return {
+      badgeLabel: "SQLite cache",
+      badgeTone: "accent" as const,
+      countLabel: `${news.length} cached`,
+      detail: "These headlines are loaded from local SQLite. Refresh Research can check providers and update this cache when available.",
+      latestDate,
+      sources,
+      title: "Cached News",
+    };
+  }
+
+  return {
+    badgeLabel: "No news",
+    badgeTone: "neutral" as const,
+    countLabel: "0 headlines",
+    detail: "No cached or refreshed headlines are available for this ticker yet.",
+    latestDate: undefined,
+    sources: [],
+    title: "Waiting For News",
+  };
 }
 
 // SnapshotSourcePanel compares saved scan sources with any refreshed provider research loaded in the drawer.

@@ -8,7 +8,7 @@ This file preserves the current project state for future Codex turns if chat con
 - Local CSV source: `Transaction_Log.csv` in the project root.
 - The app dynamically parses the local Robinhood CSV on server-rendered routes.
 - Dark fintech theme is based on the uploaded dashboard image.
-- Current stable checkpoint: `v1.3-analyzer-persistence-value-score`.
+- Current stable checkpoint: `v1.4-live-data-ready`.
 - Important routes:
   - `/` dashboard
   - `/dividends` dividend tracker
@@ -69,6 +69,11 @@ This file preserves the current project state for future Codex turns if chat con
   - `.env.example` lists every key-ready provider variable while `.env.local` remains ignored.
   - FMP is the recommended free-first news path; RSS remains a no-cost fallback if FMP news is gated.
   - Setup notes in `LIVE_DATA_SETUP.md`.
+- Live provider validation completed:
+  - Twelve Data quote and 200-candle OHLC payloads work and cache in SQLite.
+  - SEC EDGAR fundamentals work and now use annual-duration facts for income, cash flow, and revenue growth.
+  - RSS news works and caches headline payloads in SQLite.
+  - Analyzer UI has been manually confirmed to show provider OHLC instead of mock fallback.
 - Mobile dividend payout chart tooltip overflow was fixed by making first/last bar popovers align inward.
 
 ## Stable Reference Tags
@@ -78,13 +83,14 @@ This file preserves the current project state for future Codex turns if chat con
 - `v1.1.1-data-fix`: Robinhood `BCXL` correction-row handling.
 - `v1.2-market-provider-qa`: Market-data resolver prep plus mobile dividend QA cleanup.
 - `v1.3-analyzer-persistence-value-score`: SQLite analyzer persistence, provider status, research refresh, and Graham/Buffett SEC fallback wiring.
+- `v1.4-live-data-ready`: Live research provider validation with Twelve Data OHLC, SEC annual fundamentals, RSS news, SQLite caching, and corrected SEC annual fact parsing.
 
 ## Current Next Steps
 
-1. Add provider keys to `.env.local`, restart the dev server, and test `/api/research/[ticker]?refresh=1`.
-2. Confirm FMP headlines save into SQLite and display with provider source tags in the snapshot drawer.
-3. Confirm analyzer scans use provider OHLC instead of mock fallback once Twelve Data or Alpha Vantage keys are configured.
-4. Improve Graham/Buffett scoring with more real multi-year fundamentals after provider coverage is proven.
+1. Improve Graham/Buffett scoring with more real multi-year SEC fundamentals after provider coverage is proven.
+2. Consider wiring dashboard market prices/yields to the same cached provider layer while keeping CSV calculations local-first.
+3. Keep FMP stock news optional; RSS is the current working free news path.
+4. Run targeted app QA after any scoring or dashboard live-data changes.
 
 ## Verification Commands
 

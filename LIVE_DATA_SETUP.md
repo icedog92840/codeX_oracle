@@ -2,6 +2,8 @@
 
 The app is local-first. Live provider calls are disabled unless the matching environment variables are present.
 
+Current verified setup: Twelve Data quote/OHLC, SEC EDGAR annual fundamentals, and RSS ticker news all work through `/api/research/[ticker]` and cache in SQLite. FMP quote can be used as fallback; FMP stock news may require a paid-capable account plan.
+
 ## Recommended Free Stack
 
 - Twelve Data: quotes and daily OHLC candles for analyzer scans.
@@ -112,6 +114,6 @@ The analyzer currently combines:
 - Technical Timing Grade
 - News/filing context
 
-The Graham/Buffett inputs now use SEC fundamentals when configured and fall back to deterministic local estimates for missing fields. Technical indicators are kept as a small timing layer, not the main owner-grade score.
+The Graham/Buffett inputs now use SEC annual fundamentals when configured and fall back to deterministic local estimates for missing fields. Technical indicators are kept as a small timing layer, not the main owner-grade score.
 
 Analyzer OHLC is research-first: it uses cached provider candles from `/api/research/[ticker]` when available and falls back to deterministic local candles when providers are missing or return too little usable history.

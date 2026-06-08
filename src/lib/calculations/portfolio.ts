@@ -48,6 +48,14 @@ export function buildPortfolioHoldings(
       const profitLoss = marketValue - position.cost;
       const profitLossPercent = position.cost > 0 ? profitLoss / position.cost : 0;
       const dividendYield = estimateYieldFromDividendDollars(marketData.dividendYieldByTicker[ticker], marketValue);
+      const quoteFreshness = marketData.quoteMetaByTicker[ticker] ?? {
+        ageMs: null,
+        expiresAt: null,
+        fetchedAt: null,
+        provider: "CSV fallback",
+        source: "csv-fallback" as const,
+        status: "fallback" as const,
+      };
 
       return {
         ticker,
@@ -62,6 +70,7 @@ export function buildPortfolioHoldings(
         weight: 0,
         dividendYield,
         projectedAnnualDividendIncome: marketValue * dividendYield,
+        quoteFreshness,
       };
     });
 

@@ -4,10 +4,24 @@ import { getSqlite } from "@/lib/db/connection";
 // MarketDataSource names where the current quote and dividend yield values came from.
 export type MarketDataSource = "local-placeholder" | "live";
 
+// QuoteFreshnessStatus gives the UI a compact age bucket for cached quote health.
+export type QuoteFreshnessStatus = "fresh" | "good" | "aging" | "stale" | "fallback";
+
+// QuoteFreshnessMeta explains where one displayed quote came from and how old it is.
+export type QuoteFreshnessMeta = {
+  ageMs: number | null;
+  fetchedAt: string | null;
+  expiresAt: string | null;
+  provider: string;
+  source: "provider-cache" | "csv-fallback";
+  status: QuoteFreshnessStatus;
+};
+
 // MarketDataSnapshot is the UI-safe market data shape shared by local and future live providers.
 export type MarketDataSnapshot = {
   currentPriceByTicker: Record<string, number>;
   dividendYieldByTicker: Record<string, number>;
+  quoteMetaByTicker: Record<string, QuoteFreshnessMeta>;
   source: MarketDataSource;
   generatedAt: string;
 };
@@ -25,6 +39,7 @@ export const localPlaceholderMarketDataProvider: MarketDataProvider = {
       currentPriceByTicker: buildLatestKnownPriceByTicker(transactions),
       // TODO: Fetch Live Dividend Yield
       dividendYieldByTicker: buildEstimatedDividendYieldByTicker(transactions),
+      quoteMetaByTicker: buildFallbackQuoteMetaByTicker(transactions),
       source: "local-placeholder",
       generatedAt: new Date().toISOString(),
     };
@@ -35,7 +50,9 @@ export const localPlaceholderMarketDataProvider: MarketDataProvider = {
 export const cachedLiveMarketDataProvider: MarketDataProvider = {
   getMarketData(transactions) {
     const placeholder = localPlaceholderMarketDataProvider.getMarketData(transactions);
-    const cachedPrices = readCachedQuotePrices(getUniqueTickers(transactions));
+    const tickers = getUniqueTickers(transactions);
+    const cachedQuotes = readCachedQuotePrices(tickers);
+    const cachedPrices = Object.fromEntries(Array.from(cachedQuotes.entries()).map(([ticker, quote]) => [ticker, quote.price]));
 
     return {
       currentPriceByTicker: {
@@ -44,6 +61,10 @@ export const cachedLiveMarketDataProvider: MarketDataProvider = {
       },
       // TODO: Fetch Live Dividend Yield
       dividendYieldByTicker: placeholder.dividendYieldByTicker,
+      quoteMetaByTicker: {
+        ...placeholder.quoteMetaByTicker,
+        ...Object.fromEntries(Array.from(cachedQuotes.entries()).map(([ticker, quote]) => [ticker, quote.meta])),
+      },
       source: Object.keys(cachedPrices).length > 0 ? "live" : "local-placeholder",
       generatedAt: new Date().toISOString(),
     };
@@ -65,15 +86,16 @@ function buildLatestKnownPriceByTicker(transactions: NormalizedTransaction[]) {
 // readCachedQuotePrices pulls already-fetched provider quotes from SQLite without making API calls.
 function readCachedQuotePrices(tickers: string[]) {
   if (tickers.length === 0) {
-    return {};
+    return new Map<string, { meta: QuoteFreshnessMeta; price: number }>();
   }
 
   try {
     const rows = getSqlite()
-      .prepare("SELECT provider, data_json AS dataJson, cache_key AS cacheKey, fetched_at AS fetchedAt FROM provider_cache WHERE cache_key LIKE '%quote%'")
-      .all() as Array<{ cacheKey: string; dataJson: string; fetchedAt: string; provider: string }>;
+      .prepare("SELECT provider, data_json AS dataJson, cache_key AS cacheKey, fetched_at AS fetchedAt, expires_at AS expiresAt FROM provider_cache WHERE cache_key LIKE '%quote%'")
+      .all() as Array<{ cacheKey: string; dataJson: string; expiresAt: string | null; fetchedAt: string; provider: string }>;
     const tickerSet = new Set(tickers);
-    const quotes = new Map<string, { fetchedAt: string; price: number; provider: string }>();
+    const quotes = new Map<string, { fetchedAt: string; meta: QuoteFreshnessMeta; price: number; provider: string }>();
+    const now = new Date();
 
     rows.forEach((row) => {
       parseCachedQuotes(row).forEach((quote) => {
@@ -82,21 +104,25 @@ function readCachedQuotePrices(tickers: string[]) {
         }
 
         const existing = quotes.get(quote.ticker);
+        const quoteWithMeta = {
+          ...quote,
+          meta: buildCachedQuoteMeta(quote, now),
+        };
 
-        if (!existing || compareQuotePreference(quote, existing) > 0) {
-          quotes.set(quote.ticker, quote);
+        if (!existing || compareQuotePreference(quoteWithMeta, existing) > 0) {
+          quotes.set(quote.ticker, quoteWithMeta);
         }
       });
     });
 
-    return Object.fromEntries(Array.from(quotes.entries()).map(([ticker, quote]) => [ticker, quote.price]));
+    return quotes;
   } catch {
-    return {};
+    return new Map<string, { meta: QuoteFreshnessMeta; price: number }>();
   }
 }
 
 // parseCachedQuotes normalizes raw Twelve Data, FMP single quote, and FMP batch quote cache payloads.
-function parseCachedQuotes(row: { dataJson: string; fetchedAt: string; provider: string }) {
+function parseCachedQuotes(row: { dataJson: string; expiresAt: string | null; fetchedAt: string; provider: string }) {
   try {
     const data = JSON.parse(row.dataJson) as unknown;
     const quoteRows = (Array.isArray(data) ? data : [data]) as Array<{ close?: string; price?: number; symbol?: string } | undefined>;
@@ -110,6 +136,7 @@ function parseCachedQuotes(row: { dataJson: string; fetchedAt: string; provider:
       }
 
       return {
+        expiresAt: row.expiresAt,
         fetchedAt: row.fetchedAt,
         price,
         provider: row.provider,
@@ -119,6 +146,63 @@ function parseCachedQuotes(row: { dataJson: string; fetchedAt: string; provider:
   } catch {
     return [];
   }
+}
+
+// buildCachedQuoteMeta turns cache timestamps into a plain-English freshness bucket.
+function buildCachedQuoteMeta(
+  quote: { expiresAt: string | null; fetchedAt: string; provider: string },
+  now: Date,
+): QuoteFreshnessMeta {
+  const fetchedAtTime = Date.parse(quote.fetchedAt);
+  const ageMs = Number.isFinite(fetchedAtTime) ? Math.max(now.getTime() - fetchedAtTime, 0) : null;
+
+  return {
+    ageMs,
+    expiresAt: quote.expiresAt,
+    fetchedAt: quote.fetchedAt,
+    provider: quote.provider,
+    source: "provider-cache",
+    status: getQuoteFreshnessStatus(ageMs),
+  };
+}
+
+// buildFallbackQuoteMetaByTicker marks CSV-derived prices so they are visibly different from cached provider prices.
+function buildFallbackQuoteMetaByTicker(transactions: NormalizedTransaction[]) {
+  return getUniqueTickers(transactions).reduce<Record<string, QuoteFreshnessMeta>>((metaByTicker, ticker) => {
+    metaByTicker[ticker] = {
+      ageMs: null,
+      expiresAt: null,
+      fetchedAt: null,
+      provider: "CSV fallback",
+      source: "csv-fallback",
+      status: "fallback",
+    };
+
+    return metaByTicker;
+  }, {});
+}
+
+// getQuoteFreshnessStatus buckets quote age so the UI can render a subtle freshness ring.
+function getQuoteFreshnessStatus(ageMs: number | null): QuoteFreshnessStatus {
+  if (ageMs === null) {
+    return "fallback";
+  }
+
+  const hours = ageMs / (1000 * 60 * 60);
+
+  if (hours <= 4) {
+    return "fresh";
+  }
+
+  if (hours <= 8) {
+    return "good";
+  }
+
+  if (hours <= 12) {
+    return "aging";
+  }
+
+  return "stale";
 }
 
 // compareQuotePreference prefers Twelve Data, then newest cached quote data.

@@ -1,3 +1,5 @@
+import type { QuoteFreshnessMeta } from "@/lib/market-data/market-data-provider";
+
 // PortfolioHolding stores calculated position-level values before UI formatting.
 export type PortfolioHolding = {
   ticker: string;
@@ -12,6 +14,7 @@ export type PortfolioHolding = {
   weight: number;
   dividendYield: number;
   projectedAnnualDividendIncome: number;
+  quoteFreshness: QuoteFreshnessMeta;
 };
 
 // PortfolioSummary stores aggregate account values for dashboard metric cards.

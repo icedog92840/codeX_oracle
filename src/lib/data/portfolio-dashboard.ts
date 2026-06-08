@@ -90,5 +90,6 @@ function toHoldingPreview(holding: ReturnType<typeof buildPortfolioHoldings>[num
     marketValue: formatCurrency(holding.marketValue),
     profitLoss: formatSignedCurrency(holding.profitLoss),
     profitLossPercent: formatSignedPercent(holding.profitLossPercent),
+    quoteFreshness: holding.quoteFreshness,
   };
 }

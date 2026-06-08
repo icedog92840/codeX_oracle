@@ -67,6 +67,15 @@ type SnapshotPayload = {
   ticker: string;
 };
 
+// SnapshotRefreshResult stores the visible outcome after refreshing drawer research data.
+type SnapshotRefreshResult = {
+  generatedAt: string;
+  headlineCount: number;
+  sourceCount: number;
+  sources: string[];
+  staleCount: number;
+};
+
 // StockAnalyzer renders the full local stock analyzer workflow.
 export function StockAnalyzer() {
   const [tickerInput, setTickerInput] = useState("AAPL");
@@ -79,6 +88,7 @@ export function StockAnalyzer() {
   const [snapshot, setSnapshot] = useState<SnapshotPayload | null>(null);
   const [snapshotError, setSnapshotError] = useState<string | null>(null);
   const [snapshotResearch, setSnapshotResearch] = useState<StockResearchSnapshot | null>(null);
+  const [snapshotRefreshResult, setSnapshotRefreshResult] = useState<SnapshotRefreshResult | null>(null);
   const [snapshotTicker, setSnapshotTicker] = useState<string | null>(null);
   const [isSnapshotLoading, setIsSnapshotLoading] = useState(false);
   const [isResearchRefreshing, setIsResearchRefreshing] = useState(false);
@@ -200,6 +210,7 @@ export function StockAnalyzer() {
     setSnapshot(null);
     setSnapshotError(null);
     setSnapshotResearch(null);
+    setSnapshotRefreshResult(null);
     setSnapshotTicker(normalizedTicker);
     setIsSnapshotLoading(true);
 
@@ -223,6 +234,7 @@ export function StockAnalyzer() {
     setSnapshot(null);
     setSnapshotError(null);
     setSnapshotResearch(null);
+    setSnapshotRefreshResult(null);
     setSnapshotTicker(null);
     setIsSnapshotLoading(false);
     setIsResearchRefreshing(false);
@@ -232,6 +244,7 @@ export function StockAnalyzer() {
   async function refreshSnapshotResearch(ticker: string) {
     setIsResearchRefreshing(true);
     setSnapshotError(null);
+    setSnapshotRefreshResult(null);
 
     try {
       const research = await fetchResearchSnapshot(ticker, { forceRefresh: true });
@@ -241,6 +254,7 @@ export function StockAnalyzer() {
       }
 
       setSnapshotResearch(research);
+      setSnapshotRefreshResult(buildSnapshotRefreshResult(research));
       setSnapshot((currentSnapshot) => currentSnapshot ? {
         ...currentSnapshot,
         news: research.news.map((item) => ({
@@ -305,6 +319,7 @@ export function StockAnalyzer() {
           onClose={closeSnapshotDrawer}
           onRefreshResearch={refreshSnapshotResearch}
           research={snapshotResearch}
+          refreshResult={snapshotRefreshResult}
           snapshot={snapshot}
           ticker={snapshotTicker}
         />
@@ -939,6 +954,7 @@ function SnapshotDrawer({
   onClose,
   onRefreshResearch,
   research,
+  refreshResult,
   snapshot,
   ticker,
 }: {
@@ -948,6 +964,7 @@ function SnapshotDrawer({
   onClose: () => void;
   onRefreshResearch: (ticker: string) => void;
   research: StockResearchSnapshot | null;
+  refreshResult: SnapshotRefreshResult | null;
   snapshot: SnapshotPayload | null;
   ticker: string;
 }) {
@@ -1019,6 +1036,8 @@ function SnapshotDrawer({
                     {isResearchRefreshing ? "Refreshing" : "Refresh Research"}
                   </button>
                 </div>
+                <ResearchFreshnessGrid research={research} />
+                {refreshResult ? <SnapshotRefreshResultPanel result={refreshResult} /> : null}
                 <p className="mt-3 text-sm leading-6 text-muted-foreground">{latestScan.summary}</p>
               </section>
 
@@ -1267,6 +1286,133 @@ function ResearchFreshnessLine({ research }: { research: StockResearchSnapshot |
   );
 }
 
+// ResearchFreshnessGrid shows quote, candles, fundamentals, and news freshness separately.
+function ResearchFreshnessGrid({ research }: { research: StockResearchSnapshot | null }) {
+  const rows = buildResearchFreshnessRows(research);
+
+  return (
+    <div className="mt-2 grid gap-2 sm:grid-cols-2">
+      {rows.map((row) => (
+        <div key={row.label} className="rounded-xl border bg-[#191929] p-2">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="truncate text-[10px] uppercase text-muted-foreground">{row.label}</p>
+              <p
+                className={cn(
+                  "mt-1 truncate font-mono text-[11px] font-semibold",
+                  row.tone === "positive" && "text-emerald-300",
+                  row.tone === "warning" && "text-amber-200",
+                  row.tone === "neutral" && "text-muted-foreground",
+                )}
+              >
+                {row.value}
+              </p>
+            </div>
+            <SourceTag label={row.status} tone={row.tone} />
+          </div>
+          <p className="mt-1 truncate text-[10px] text-muted-foreground">{row.detail}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// SnapshotRefreshResultPanel confirms what the last Refresh Research click loaded.
+function SnapshotRefreshResultPanel({ result }: { result: SnapshotRefreshResult }) {
+  return (
+    <div className="mt-2 rounded-xl border border-primary/25 bg-primary/5 p-3">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase text-primary">Refresh Complete</p>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            Loaded {result.sourceCount} cached source{result.sourceCount === 1 ? "" : "s"} and {result.headlineCount} headline{result.headlineCount === 1 ? "" : "s"}.
+          </p>
+        </div>
+        <SourceTag label={`${result.staleCount} stale`} tone={result.staleCount > 0 ? "warning" : "positive"} />
+      </div>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {result.sources.length ? (
+          result.sources.map((source) => <SourceTag key={source} label={source} tone="accent" />)
+        ) : (
+          <SourceTag label="No provider source" tone="warning" />
+        )}
+        <span className="rounded-full border border-border px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
+          {formatShortDate(result.generatedAt)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// buildResearchFreshnessRows creates one freshness row for each research surface in the drawer.
+function buildResearchFreshnessRows(research: StockResearchSnapshot | null) {
+  const newsFreshness = research?.news.find((item) => item.freshness)?.freshness;
+
+  return [
+    buildFreshnessRow({
+      freshness: research?.quote?.freshness,
+      label: "Quote",
+      missingDetail: "No refreshed quote loaded",
+      provider: research?.quote?.source,
+      value: research?.quote ? formatCurrency(research.quote.price) : "Unavailable",
+    }),
+    buildFreshnessRow({
+      freshness: research?.ohlc?.freshness,
+      label: "OHLC Candles",
+      missingDetail: "No refreshed candles loaded",
+      provider: research?.ohlc?.source,
+      value: research?.ohlc ? `${research.ohlc.candles.length} candles` : "Unavailable",
+    }),
+    buildFreshnessRow({
+      freshness: research?.fundamentals?.freshness,
+      label: "Fundamentals",
+      missingDetail: "No refreshed fundamentals loaded",
+      provider: research?.fundamentals?.source,
+      value: research?.fundamentals ? "Available" : "Unavailable",
+    }),
+    buildFreshnessRow({
+      freshness: newsFreshness,
+      label: "News",
+      missingDetail: "No refreshed headlines loaded",
+      provider: research?.news.find((item) => item.source)?.source,
+      value: `${research?.news.length ?? 0} headlines`,
+    }),
+  ];
+}
+
+// buildFreshnessRow converts one optional provider freshness object into a compact UI row.
+function buildFreshnessRow({
+  freshness,
+  label,
+  missingDetail,
+  provider,
+  value,
+}: {
+  freshness?: SourceFreshness;
+  label: string;
+  missingDetail: string;
+  provider?: string;
+  value: string;
+}) {
+  if (!freshness) {
+    return {
+      detail: missingDetail,
+      label,
+      status: "Missing",
+      tone: "neutral" as const,
+      value,
+    };
+  }
+
+  return {
+    detail: `${provider ? formatSourceLabel(provider) : formatSourceLabel(freshness.source)} / fetched ${formatShortDate(freshness.fetchedAt)} / expires ${formatShortDate(freshness.expiresAt)}`,
+    label,
+    status: freshness.isStale ? "Stale" : "Fresh",
+    tone: freshness.isStale ? "warning" as const : "positive" as const,
+    value,
+  };
+}
+
 // buildChartGeometry converts close prices into SVG points, path, and grid labels.
 function buildChartGeometry(candles: OhlcCandle[], support: number, resistance: number) {
   const values = candles.flatMap((candle) => [candle.close, support, resistance]);
@@ -1392,6 +1538,39 @@ async function fetchResearchSnapshot(ticker: string, options: { forceRefresh?: b
   } catch {
     return null;
   }
+}
+
+// buildSnapshotRefreshResult summarizes refreshed research so the drawer can confirm what changed.
+function buildSnapshotRefreshResult(research: StockResearchSnapshot): SnapshotRefreshResult {
+  const freshness = [
+    research.quote?.freshness,
+    research.ohlc?.freshness,
+    research.fundamentals?.freshness,
+    research.news.find((item) => item.freshness)?.freshness,
+  ].filter((item): item is SourceFreshness => Boolean(item));
+  const sources = new Set<string>();
+
+  if (research.quote?.source) {
+    sources.add(research.quote.source);
+  }
+
+  if (research.ohlc?.source) {
+    sources.add(research.ohlc.source);
+  }
+
+  if (research.fundamentals?.source) {
+    sources.add(research.fundamentals.source);
+  }
+
+  research.news.forEach((item) => sources.add(item.source));
+
+  return {
+    generatedAt: research.generatedAt,
+    headlineCount: research.news.length,
+    sourceCount: freshness.length,
+    sources: Array.from(sources),
+    staleCount: freshness.filter((item) => item.isStale).length,
+  };
 }
 
 // persistWatchlistItem mirrors one saved watchlist row into SQLite.

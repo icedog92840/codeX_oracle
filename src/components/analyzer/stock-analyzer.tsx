@@ -455,6 +455,8 @@ function ValueScorecardPanel({ scan }: { scan: AnalyzerScan }) {
         </div>
       </div>
 
+      <ScoreSourcePanel scan={scan} />
+
       <div className="mt-3 grid gap-3 xl:grid-cols-2">
         <ValueScorePanel score={scorecard.graham} />
         <ValueScorePanel score={scorecard.buffett} />
@@ -465,6 +467,99 @@ function ValueScorecardPanel({ scan }: { scan: AnalyzerScan }) {
         Data confidence: {dataConfidence.providerFields}/{dataConfidence.totalFields} owner-score fundamentals came from provider data.
       </div>
     </section>
+  );
+}
+
+// ScoreSourcePanel explains which parts of the owner grade came from live/cache data versus estimates.
+function ScoreSourcePanel({ scan }: { scan: AnalyzerScan }) {
+  const scorecard = scan.valueScorecard;
+  const confidence = getValueDataConfidence(scorecard);
+  const feedStatus = scan.feedStatus;
+  const isProviderFeed = feedStatus.source === "provider";
+
+  return (
+    <div className="mt-3 grid gap-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.85fr)]">
+      <ScoreSourceCard
+        detail={feedStatus.detail}
+        label="Price + Candles"
+        sourceLabel={feedStatus.provider ? formatSourceLabel(feedStatus.provider) : "Mock fallback"}
+        tone={isProviderFeed ? "positive" : "warning"}
+        value={feedStatus.label}
+      />
+      <ScoreSourceCard
+        detail={confidence.description}
+        label="Value Inputs"
+        sourceLabel={confidence.provider ? formatSourceLabel(confidence.provider) : "Local estimates"}
+        tone={confidence.level === "estimated" ? "warning" : confidence.level === "mixed" ? "accent" : "positive"}
+        value={`${confidence.providerFields}/${confidence.totalFields} provider`}
+      />
+      <div className="rounded-xl border bg-[#191929] p-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="truncate text-[10px] uppercase text-muted-foreground">Final Weighting</p>
+            <p className="mt-1 font-mono text-xs font-semibold text-primary">42 / 48 / 10</p>
+          </div>
+          <SourceTag label="Formula" tone="accent" />
+        </div>
+        <div className="mt-3 grid gap-1.5">
+          <WeightLine label="Graham" percent={42} />
+          <WeightLine label="Buffett" percent={48} />
+          <WeightLine label="Timing" percent={10} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ScoreSourceCard renders one source/coverage explanation block for analyzer grades.
+function ScoreSourceCard({
+  detail,
+  label,
+  sourceLabel,
+  tone,
+  value,
+}: {
+  detail: string;
+  label: string;
+  sourceLabel: string;
+  tone: "accent" | "positive" | "warning";
+  value: string;
+}) {
+  return (
+    <div className="rounded-xl border bg-[#191929] p-3">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="truncate text-[10px] uppercase text-muted-foreground">{label}</p>
+          <p
+            className={cn(
+              "mt-1 truncate font-mono text-xs font-semibold",
+              tone === "positive" && "text-emerald-300",
+              tone === "accent" && "text-primary",
+              tone === "warning" && "text-amber-200",
+            )}
+          >
+            {value}
+          </p>
+        </div>
+        <SourceTag label={sourceLabel} tone={tone} />
+      </div>
+      <p className="mt-2 line-clamp-3 text-xs leading-5 text-muted-foreground">{detail}</p>
+    </div>
+  );
+}
+
+// WeightLine renders one contribution bar in the combined owner-grade formula.
+function WeightLine({ label, percent }: { label: string; percent: number }) {
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-2 text-[10px] uppercase text-muted-foreground">
+        <span>{label}</span>
+        <span className="font-mono">{percent}%</span>
+      </div>
+      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-[#11111f]">
+        <div className="h-full rounded-full bg-[linear-gradient(90deg,#38d5ff,#7c3aed)]" style={{ width: `${percent}%` }} />
+      </div>
+    </div>
   );
 }
 
@@ -952,6 +1047,7 @@ function SnapshotDrawer({
                     </div>
                     <DataConfidenceBadge confidence={getValueDataConfidence(latestScorecard)} />
                   </div>
+                  <SnapshotSourcePanel latestScan={latestScan} research={research} />
                   <p className="mt-3 rounded-xl border bg-[#191929] p-3 text-xs leading-5 text-muted-foreground">
                     This badge travels with saved scans, so an older watchlist snapshot can be compared against a newer provider-backed scan after you re-run the ticker.
                   </p>
@@ -1027,6 +1123,93 @@ function SnapshotDrawer({
       </div>
     </div>
   );
+}
+
+// SnapshotSourcePanel compares saved scan sources with any refreshed provider research loaded in the drawer.
+function SnapshotSourcePanel({
+  latestScan,
+  research,
+}: {
+  latestScan: SnapshotScan;
+  research: StockResearchSnapshot | null;
+}) {
+  const scorecard = latestScan.metrics.valueScorecard;
+  const confidence = scorecard ? getValueDataConfidence(scorecard) : null;
+  const feedStatus = getSnapshotFeedStatus(latestScan);
+  const sourceRows = buildSnapshotSourceRows(latestScan, research, feedStatus, confidence);
+
+  return (
+    <div className="mt-3 grid gap-2">
+      {sourceRows.map((row) => (
+        <div key={row.label} className="rounded-xl border bg-[#191929] p-3">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="truncate text-[10px] uppercase text-muted-foreground">{row.label}</p>
+              <p
+                className={cn(
+                  "mt-1 truncate font-mono text-xs font-semibold",
+                  row.tone === "positive" && "text-emerald-300",
+                  row.tone === "accent" && "text-primary",
+                  row.tone === "warning" && "text-amber-200",
+                  row.tone === "neutral" && "text-foreground",
+                )}
+              >
+                {row.value}
+              </p>
+            </div>
+            <SourceTag label={row.sourceLabel} tone={row.tone} />
+          </div>
+          <p className="mt-2 text-xs leading-5 text-muted-foreground">{row.detail}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// buildSnapshotSourceRows creates plain-English drawer rows for saved scan and refreshed research sources.
+function buildSnapshotSourceRows(
+  latestScan: SnapshotScan,
+  research: StockResearchSnapshot | null,
+  feedStatus: AnalyzerFeedStatus,
+  confidence: AnalyzerScan["valueScorecard"]["dataConfidence"] | null,
+) {
+  const quoteSource = research?.quote?.source;
+  const newsSource = research?.news.find((item) => item.source)?.source;
+
+  return [
+    {
+      detail: feedStatus.detail,
+      label: "Saved Scan Feed",
+      sourceLabel: feedStatus.provider ? formatSourceLabel(feedStatus.provider) : latestScan.source,
+      tone: feedStatus.source === "provider" ? "positive" as const : "warning" as const,
+      value: feedStatus.label,
+    },
+    {
+      detail: confidence?.description ?? "This saved scan predates value-input source tracking. Re-run the ticker to save provider versus estimate coverage.",
+      label: "Saved Value Inputs",
+      sourceLabel: confidence?.provider ? formatSourceLabel(confidence.provider) : "Local estimates",
+      tone: confidence?.level === "provider" ? "positive" as const : confidence?.level === "mixed" ? "accent" as const : "warning" as const,
+      value: confidence ? `${confidence.providerFields}/${confidence.totalFields} provider` : "Legacy",
+    },
+    {
+      detail: research?.quote
+        ? `Latest drawer research has a ${formatSourceLabel(research.quote.source)} quote at ${formatCurrency(research.quote.price)}. This does not rewrite the saved scan until you run a new analyzer scan.`
+        : "No refreshed quote is loaded in this drawer yet. Use Refresh Research after provider keys are configured.",
+      label: "Refreshed Quote",
+      sourceLabel: quoteSource ? formatSourceLabel(quoteSource) : "Not loaded",
+      tone: quoteSource ? "positive" as const : "neutral" as const,
+      value: research?.quote ? formatCurrency(research.quote.price) : "Unavailable",
+    },
+    {
+      detail: research?.news.length
+        ? `${research.news.length} current headlines are loaded for the drawer. News is saved to SQLite so watchlist snapshots can open without repeatedly hitting providers.`
+        : "No refreshed headlines are loaded. FMP free plans may gate some news endpoints, so RSS remains the local-friendly fallback.",
+      label: "News Feed",
+      sourceLabel: newsSource ? formatSourceLabel(newsSource) : "SQLite/RSS/FMP",
+      tone: research?.news.length ? "accent" as const : "neutral" as const,
+      value: `${research?.news.length ?? 0} headlines`,
+    },
+  ];
 }
 
 // SnapshotMetric renders one saved snapshot metric.

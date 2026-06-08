@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowDown, ArrowUp, ArrowUpDown, Loader2, RefreshCw } from "lucide-react";
 import type { HoldingPreview } from "@/lib/types/dashboard";
 import { cn } from "@/lib/utils";
 
@@ -38,11 +39,35 @@ const columns: ColumnDefinition[] = [
 
 // HoldingsTablePreview renders a sortable dense financial table for parsed holdings.
 export function HoldingsTablePreview({ holdings }: { holdings: HoldingPreview[] }) {
+  const router = useRouter();
   const [sortState, setSortState] = useState<SortState>({ key: "marketValue", direction: "desc" });
+  const [refreshingTicker, setRefreshingTicker] = useState<string | null>(null);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
   const sortedHoldings = useMemo(
     () => sortHoldings(holdings, sortState),
     [holdings, sortState],
   );
+
+  // refreshTickerPrice updates one cached FMP quote, then refreshes server-rendered dashboard values.
+  async function refreshTickerPrice(ticker: string) {
+    setRefreshingTicker(ticker);
+    setRefreshError(null);
+
+    try {
+      const response = await fetch(`/api/market/refresh-quote/${encodeURIComponent(ticker)}`, { method: "POST" });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? `Unable to refresh ${ticker}.`);
+      }
+
+      router.refresh();
+    } catch (error) {
+      setRefreshError(error instanceof Error ? error.message : `Unable to refresh ${ticker}.`);
+    } finally {
+      setRefreshingTicker(null);
+    }
+  }
 
   return (
     <section className="overflow-hidden rounded-xl border bg-card/90 shadow-[0_18px_45px_rgba(0,0,0,0.20)]">
@@ -50,12 +75,13 @@ export function HoldingsTablePreview({ holdings }: { holdings: HoldingPreview[] 
         <div>
           <h2 className="text-base font-semibold">Holdings</h2>
           <p className="text-xs text-muted-foreground">Cost basis, weighting, and current value</p>
+          {refreshError ? <p className="mt-1 max-w-xl text-xs text-amber-200">{refreshError}</p> : null}
         </div>
         <span className="font-mono text-xs text-muted-foreground">{holdings.length} assets</span>
       </div>
       <div className="grid gap-2 p-3 md:hidden">
         {sortedHoldings.map((holding) => (
-          <HoldingMobileCard key={holding.ticker} holding={holding} />
+          <HoldingMobileCard key={holding.ticker} holding={holding} onRefreshPrice={refreshTickerPrice} refreshingTicker={refreshingTicker} />
         ))}
       </div>
       <div className="hidden md:block">
@@ -89,7 +115,14 @@ export function HoldingsTablePreview({ holdings }: { holdings: HoldingPreview[] 
                 <td className="px-3 py-2 text-right font-mono">{holding.weight}</td>
                 <td className="px-3 py-2 text-right font-mono">{holding.averagePrice}</td>
                 <td className="px-3 py-2 text-right font-mono">{holding.totalCost}</td>
-                <td className="px-3 py-2 text-right font-mono">{holding.currentPrice}</td>
+                <td className="px-3 py-2 text-right font-mono">
+                  <PriceRefreshButton
+                    onRefresh={() => refreshTickerPrice(holding.ticker)}
+                    value={holding.currentPrice}
+                    isRefreshing={refreshingTicker === holding.ticker}
+                    ticker={holding.ticker}
+                  />
+                </td>
                 <td className="px-3 py-2 text-right font-mono">{holding.marketValue}</td>
                 <td className={cn("px-3 py-2 text-right font-mono", holding.profitLoss.startsWith("-") ? "text-rose-300" : "text-emerald-300")}>{holding.profitLoss}</td>
                 <td className={cn("px-3 py-2 text-right font-mono", holding.profitLossPercent.startsWith("-") ? "text-rose-300" : "text-emerald-300")}>{holding.profitLossPercent}</td>
@@ -103,7 +136,15 @@ export function HoldingsTablePreview({ holdings }: { holdings: HoldingPreview[] 
 }
 
 // HoldingMobileCard renders one holding as stacked data for narrow screens.
-function HoldingMobileCard({ holding }: { holding: HoldingPreview }) {
+function HoldingMobileCard({
+  holding,
+  onRefreshPrice,
+  refreshingTicker,
+}: {
+  holding: HoldingPreview;
+  onRefreshPrice: (ticker: string) => void;
+  refreshingTicker: string | null;
+}) {
   return (
     <article className="rounded-xl border bg-[#191929] p-3">
       <div className="flex items-start justify-between gap-3">
@@ -120,7 +161,7 @@ function HoldingMobileCard({ holding }: { holding: HoldingPreview }) {
         <HoldingStat label="Shares" value={holding.shares} />
         <HoldingStat label="Weight" value={holding.weight} />
         <HoldingStat label="Avg Paid" value={holding.averagePrice} />
-        <HoldingStat label="Price" value={holding.currentPrice} />
+        <HoldingStat label="Price" value={holding.currentPrice} onRefresh={() => onRefreshPrice(holding.ticker)} isRefreshing={refreshingTicker === holding.ticker} ticker={holding.ticker} />
         <HoldingStat label="Total Cost" value={holding.totalCost} />
         <HoldingStat label="P/L" value={`${holding.profitLoss} (${holding.profitLossPercent})`} tone={holding.profitLoss.startsWith("-") ? "negative" : "positive"} />
       </div>
@@ -129,12 +170,57 @@ function HoldingMobileCard({ holding }: { holding: HoldingPreview }) {
 }
 
 // HoldingStat renders one mobile holding metric with optional gain/loss tone.
-function HoldingStat({ label, value, tone }: { label: string; value: string; tone?: "positive" | "negative" }) {
+function HoldingStat({
+  isRefreshing = false,
+  label,
+  onRefresh,
+  ticker,
+  tone,
+  value,
+}: {
+  isRefreshing?: boolean;
+  label: string;
+  onRefresh?: () => void;
+  ticker?: string;
+  tone?: "positive" | "negative";
+  value: string;
+}) {
   return (
     <div className="min-w-0 rounded-lg bg-secondary/45 px-2 py-1.5">
       <p className="truncate text-[10px] uppercase text-muted-foreground">{label}</p>
-      <p className={cn("truncate font-mono text-xs font-semibold", tone === "positive" && "text-emerald-300", tone === "negative" && "text-rose-300")}>{value}</p>
+      {onRefresh && ticker ? (
+        <PriceRefreshButton isRefreshing={isRefreshing} onRefresh={onRefresh} ticker={ticker} value={value} />
+      ) : (
+        <p className={cn("truncate font-mono text-xs font-semibold", tone === "positive" && "text-emerald-300", tone === "negative" && "text-rose-300")}>{value}</p>
+      )}
     </div>
+  );
+}
+
+// PriceRefreshButton renders a compact FMP-only quote refresh affordance for one holding.
+function PriceRefreshButton({
+  isRefreshing,
+  onRefresh,
+  ticker,
+  value,
+}: {
+  isRefreshing: boolean;
+  onRefresh: () => void;
+  ticker: string;
+  value: string;
+}) {
+  return (
+    <button
+      className="inline-flex max-w-full items-center justify-end gap-1 rounded-lg px-1 py-0.5 font-mono text-xs font-semibold text-primary outline-none transition-colors hover:bg-primary/10 focus-visible:ring-2 focus-visible:ring-ring/35 disabled:cursor-not-allowed disabled:opacity-60"
+      disabled={isRefreshing}
+      onClick={onRefresh}
+      type="button"
+      aria-label={`Refresh ${ticker} price through FMP`}
+      title={`Refresh ${ticker} price through FMP`}
+    >
+      <span className="truncate">{value}</span>
+      {isRefreshing ? <Loader2 className="size-3 animate-spin" aria-hidden="true" /> : <RefreshCw className="size-3 opacity-70" aria-hidden="true" />}
+    </button>
   );
 }
 

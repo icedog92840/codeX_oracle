@@ -113,6 +113,14 @@ Portfolio quote cache can be refreshed through:
 
 That route reads open holdings from the CSV, tries FMP batch quotes when the account supports them, then falls back to budget-guarded Twelve Data quotes. The dashboard reads cached quote rows from SQLite and does not spend API calls during normal page render.
 
+One holding quote can be refreshed through:
+
+```text
+/api/market/refresh-quote/AAPL
+```
+
+That route uses FMP only. It is meant for manual price clicks on the dashboard so one ticker can be updated without spending Twelve Data calls.
+
 ## Analyzer Direction
 
 The analyzer currently combines:

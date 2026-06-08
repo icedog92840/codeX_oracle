@@ -77,6 +77,7 @@ This file preserves the current project state for future Codex turns if chat con
   - Analyzer UI has been manually confirmed to show provider OHLC instead of mock fallback.
   - Dashboard AAPL holding was manually confirmed to use cached Twelve Data quote pricing after a research scan.
   - Portfolio Quote Refresh panel was added to `/data-providers`; it tries FMP batch quotes when available and falls back to Twelve Data with budget guards.
+  - Dashboard holding price values are clickable and refresh one ticker through FMP only, then re-render from SQLite cache.
 - Mobile dividend payout chart tooltip overflow was fixed by making first/last bar popovers align inward.
 
 ## Stable Reference Tags

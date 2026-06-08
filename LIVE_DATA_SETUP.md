@@ -105,6 +105,14 @@ Analyzer scans and watchlist add/remove actions are mirrored through:
 /api/watchlist
 ```
 
+Portfolio quote cache can be refreshed through:
+
+```text
+/api/market/refresh-quotes
+```
+
+That route reads open holdings from the CSV, tries FMP batch quotes when the account supports them, then falls back to budget-guarded Twelve Data quotes. The dashboard reads cached quote rows from SQLite and does not spend API calls during normal page render.
+
 ## Analyzer Direction
 
 The analyzer currently combines:

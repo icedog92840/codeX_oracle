@@ -25,6 +25,7 @@ The app is past the original Version 1.0 baseline and is currently tagged at `v1
 - Analyzer OHLC candles: Twelve Data cached provider candles when configured, with Alpha Vantage and deterministic local mock fallbacks. The provider interface lives in `src/lib/analyzer`. No external indicator API is used.
 - Analyzer value metrics: SEC annual fundamentals when configured, with deterministic local estimates as fallback.
 - Analyzer news: RSS news fallback is cached in SQLite; FMP stock news remains optional if the account plan supports it.
+- Portfolio quote refresh: `/api/market/refresh-quotes` updates cached quotes for open holdings without running deep Analyzer scans. FMP batch quote is used when available; Twelve Data is the free-tier fallback with budget guards.
 - Live research setup: See `LIVE_DATA_SETUP.md` for Twelve Data, SEC EDGAR, FMP, Alpha Vantage, RSS, SQLite cache TTLs, API-budget safety, and the `/data-providers` research test harness.
 
 ## Local Commands

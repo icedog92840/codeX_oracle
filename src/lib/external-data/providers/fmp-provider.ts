@@ -60,6 +60,40 @@ export async function getFmpQuote(ticker: string, options: { forceRefresh?: bool
   };
 }
 
+// getFmpBatchQuotes returns multiple quotes in one request when FMP batch access is available.
+export async function getFmpBatchQuotes(tickers: string[], options: { forceRefresh?: boolean } = {}): Promise<LiveQuote[]> {
+  const availability = getProviderAvailability("fmp");
+  const symbols = Array.from(new Set(tickers.map(normalizeTicker).filter(Boolean))).sort();
+
+  if (!availability.enabled || symbols.length === 0) {
+    return [];
+  }
+
+  const url = new URL("https://financialmodelingprep.com/stable/batch-quote");
+  url.searchParams.set("apikey", process.env.FMP_API_KEY ?? "");
+  url.searchParams.set("symbols", symbols.join(","));
+  const response = await fetchJsonWithCache<FmpQuoteResponse>({
+    budget: freeApiBudgets.fmp,
+    cacheParts: { symbols: symbols.join(",") },
+    endpoint: "batch_quote",
+    forceRefresh: options.forceRefresh,
+    provider: "fmp",
+    ttlMs: cacheTtls.quote,
+    url: url.toString(),
+  });
+
+  return response.data
+    .filter((quote) => quote.symbol && quote.price && quote.price > 0)
+    .map((quote) => ({
+      freshness: buildSourceFreshness(response),
+      name: quote.name,
+      percentChange: quote.changesPercentage,
+      price: quote.price ?? 0,
+      source: "fmp",
+      ticker: quote.symbol ?? "",
+    }));
+}
+
 // getFmpStockNews returns recent ticker headlines when FMP_API_KEY is configured.
 export async function getFmpStockNews(ticker: string, limit = 10, options: { forceRefresh?: boolean } = {}): Promise<StockNewsItem[]> {
   const availability = getProviderAvailability("fmp");

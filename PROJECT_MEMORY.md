@@ -65,6 +65,7 @@ This file preserves the current project state for future Codex turns if chat con
   - `/api/research/[ticker]?refresh=1` for budget-guarded provider refreshes.
   - Server routes `/api/analyzer/scans` and `/api/watchlist` for SQLite-backed scan and watchlist persistence.
   - Server route `/api/analyzer/snapshot/[ticker]` for saved scan history plus cached news.
+  - Server route `/api/market/refresh-quotes` for portfolio-wide lightweight quote refresh without deep Analyzer scans.
   - `/data-providers` includes an isolated Research Test Harness for checking `/api/research/[ticker]` quote, OHLC, fundamentals, news, source tags, and cache freshness.
   - `.env.example` lists every key-ready provider variable while `.env.local` remains ignored.
   - FMP is the recommended free-first news path; RSS remains a no-cost fallback if FMP news is gated.
@@ -75,6 +76,7 @@ This file preserves the current project state for future Codex turns if chat con
   - RSS news works and caches headline payloads in SQLite.
   - Analyzer UI has been manually confirmed to show provider OHLC instead of mock fallback.
   - Dashboard AAPL holding was manually confirmed to use cached Twelve Data quote pricing after a research scan.
+  - Portfolio Quote Refresh panel was added to `/data-providers`; it tries FMP batch quotes when available and falls back to Twelve Data with budget guards.
 - Mobile dividend payout chart tooltip overflow was fixed by making first/last bar popovers align inward.
 
 ## Stable Reference Tags

@@ -1,4 +1,5 @@
 import { Activity, CheckCircle2, CircleAlert, Database, KeyRound, ShieldCheck, Waves } from "lucide-react";
+import { PortfolioQuoteRefreshPanel } from "@/components/data-providers/portfolio-quote-refresh-panel";
 import { ResearchTestHarness } from "@/components/data-providers/research-test-harness";
 import { analyzerDataSettings } from "@/lib/analyzer/analyzer-data-settings";
 import { getProviderStatuses, type ProviderStatus } from "@/lib/data/provider-status";
@@ -65,6 +66,8 @@ export default function DataProvidersPage() {
       </section>
 
       <ResearchTestHarness />
+
+      <PortfolioQuoteRefreshPanel />
 
       <section className="rounded-xl border bg-card/90 p-3 shadow-[0_18px_45px_rgba(0,0,0,0.20)]">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">

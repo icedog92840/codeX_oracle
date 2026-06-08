@@ -70,23 +70,23 @@ function readCachedQuotePrices(tickers: string[]) {
 
   try {
     const rows = getSqlite()
-      .prepare("SELECT provider, data_json AS dataJson, cache_key AS cacheKey, fetched_at AS fetchedAt FROM provider_cache WHERE cache_key LIKE '%:quote:%'")
+      .prepare("SELECT provider, data_json AS dataJson, cache_key AS cacheKey, fetched_at AS fetchedAt FROM provider_cache WHERE cache_key LIKE '%quote%'")
       .all() as Array<{ cacheKey: string; dataJson: string; fetchedAt: string; provider: string }>;
     const tickerSet = new Set(tickers);
     const quotes = new Map<string, { fetchedAt: string; price: number; provider: string }>();
 
     rows.forEach((row) => {
-      const quote = parseCachedQuote(row);
+      parseCachedQuotes(row).forEach((quote) => {
+        if (!tickerSet.has(quote.ticker)) {
+          return;
+        }
 
-      if (!quote || !tickerSet.has(quote.ticker)) {
-        return;
-      }
+        const existing = quotes.get(quote.ticker);
 
-      const existing = quotes.get(quote.ticker);
-
-      if (!existing || compareQuotePreference(quote, existing) > 0) {
-        quotes.set(quote.ticker, quote);
-      }
+        if (!existing || compareQuotePreference(quote, existing) > 0) {
+          quotes.set(quote.ticker, quote);
+        }
+      });
     });
 
     return Object.fromEntries(Array.from(quotes.entries()).map(([ticker, quote]) => [ticker, quote.price]));
@@ -95,26 +95,29 @@ function readCachedQuotePrices(tickers: string[]) {
   }
 }
 
-// parseCachedQuote normalizes raw Twelve Data and FMP quote cache payloads into one shape.
-function parseCachedQuote(row: { dataJson: string; fetchedAt: string; provider: string }) {
+// parseCachedQuotes normalizes raw Twelve Data, FMP single quote, and FMP batch quote cache payloads.
+function parseCachedQuotes(row: { dataJson: string; fetchedAt: string; provider: string }) {
   try {
     const data = JSON.parse(row.dataJson) as unknown;
-    const quote = (Array.isArray(data) ? data[0] : data) as { close?: string; price?: number; symbol?: string } | undefined;
-    const price = typeof quote?.price === "number" ? quote.price : Number(quote?.close ?? 0);
-    const ticker = quote?.symbol?.trim().toUpperCase();
+    const quoteRows = (Array.isArray(data) ? data : [data]) as Array<{ close?: string; price?: number; symbol?: string } | undefined>;
 
-    if (!ticker || !Number.isFinite(price) || price <= 0) {
-      return null;
-    }
+    return quoteRows.flatMap((quote) => {
+      const price = typeof quote?.price === "number" ? quote.price : Number(quote?.close ?? 0);
+      const ticker = quote?.symbol?.trim().toUpperCase();
 
-    return {
-      fetchedAt: row.fetchedAt,
-      price,
-      provider: row.provider,
-      ticker,
-    };
+      if (!ticker || !Number.isFinite(price) || price <= 0) {
+        return [];
+      }
+
+      return {
+        fetchedAt: row.fetchedAt,
+        price,
+        provider: row.provider,
+        ticker,
+      };
+    });
   } catch {
-    return null;
+    return [];
   }
 }
 

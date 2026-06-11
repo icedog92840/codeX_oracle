@@ -38,8 +38,19 @@ export type DividendAssetRow = {
   dripShares: string;
   dripAverageCostValue: number;
   dripAverageCost: string;
+  annualDividendIncomeValue: number;
+  annualDividendIncome: string;
+  yieldCostBasisValue: number;
+  yieldCostBasis: string;
   yieldOnCostValue: number;
   yieldOnCost: string;
+  yieldOnCostScaleMax: number;
+  distributionPaybackValue: number;
+  distributionPayback: string;
+  lifetimeCashPurchasesValue: number;
+  lifetimeCashPurchases: string;
+  lifetimeDistributionsValue: number;
+  lifetimeDistributions: string;
 };
 
 // DividendAssetEvent stores one recent dividend payment for ticker popouts and mobile cards.
@@ -99,6 +110,7 @@ export type DividendTrackingData = {
   selectedRangeKey: string;
   selectedRangeLabel: string;
   selectedMetricLabel: string;
+  yieldOnCostYear: number;
   calendarRangeLabel: string;
   latestYear: number;
   availableYears: number[];
@@ -125,6 +137,7 @@ type DividendHoldingMetric = {
   nonDripCost: number;
   dripShares: number;
   dripCost: number;
+  lifetimeNonDripCashCost: number;
 };
 
 // getDividendTrackingData reads local CSV dividends and builds matrix/calendar views.
@@ -143,8 +156,9 @@ export function getDividendTrackingData(
   const selectedDividends = isAllRange
     ? dividendTransactions
     : dividendTransactions.filter((transaction) => transaction.date.getFullYear() === exactYear);
+  const annualYieldDividends = dividendTransactions.filter((transaction) => transaction.date.getFullYear() === exactYear);
   const holdingMetrics = buildDividendHoldingMetrics(transactions);
-  const assetRows = sortAssetRows(buildAssetRows(selectedDividends, dividendTransactions, holdingMetrics), sort);
+  const assetRows = sortAssetRows(buildAssetRows(selectedDividends, annualYieldDividends, dividendTransactions, holdingMetrics), sort);
   const months = buildMonths(selectedDividends);
   const annualTrendPoints = buildAnnualTrendPoints(dividendTransactions);
   const totalForYear = selectedDividends.reduce((total, transaction) => total + Math.max(transaction.amount ?? 0, 0), 0);
@@ -160,6 +174,7 @@ export function getDividendTrackingData(
     selectedRangeKey: isAllRange ? "all" : String(exactYear),
     selectedRangeLabel,
     selectedMetricLabel: isAllRange ? "All Dividends" : `${exactYear} Dividends`,
+    yieldOnCostYear: exactYear,
     calendarRangeLabel: isAllRange ? "across all years" : `in ${exactYear}`,
     latestYear,
     availableYears,
@@ -216,11 +231,14 @@ function isDividendTransaction(transaction: NormalizedTransaction) {
 // buildAssetRows groups selected-range dividends while attaching historical payout context by ticker.
 function buildAssetRows(
   transactions: NormalizedTransaction[],
+  annualYieldTransactions: NormalizedTransaction[],
   historicalTransactions: NormalizedTransaction[],
   holdingMetrics: Map<string, DividendHoldingMetric>,
 ): DividendAssetRow[] {
   const rows = new Map<string, { name: string; monthly: number[]; events: NormalizedTransaction[] }>();
   const historicalEventsByTicker = buildHistoricalDividendEventsByTicker(historicalTransactions);
+  const annualDividendsByTicker = buildDividendTotalsByTicker(annualYieldTransactions);
+  const lifetimeDividendsByTicker = buildDividendTotalsByTicker(historicalTransactions);
 
   transactions.forEach((transaction) => {
     const ticker = transaction.ticker || "Cash";
@@ -235,7 +253,7 @@ function buildAssetRows(
     rows.set(ticker, existing);
   });
 
-  return Array.from(rows.entries())
+  const assetRows = Array.from(rows.entries())
     .map(([ticker, row]) => {
       const total = row.monthly.reduce((sum, amount) => sum + amount, 0);
       const metric = holdingMetrics.get(ticker);
@@ -244,7 +262,11 @@ function buildAssetRows(
       const adjustedAverageCost = metric && metric.shares > 0 ? adjustedCost / metric.shares : 0;
       const dripAverageCost = metric && metric.dripShares > 0 ? metric.dripCost / metric.dripShares : 0;
       const yieldCostBasis = metric?.nonDripCost ?? 0;
-      const yieldOnCost = yieldCostBasis > 0 ? total / yieldCostBasis : 0;
+      const annualDividendIncome = annualDividendsByTicker.get(ticker) ?? 0;
+      const yieldOnCost = yieldCostBasis > 0 ? annualDividendIncome / yieldCostBasis : 0;
+      const lifetimeDistributions = lifetimeDividendsByTicker.get(ticker) ?? 0;
+      const lifetimeCashPurchases = metric?.lifetimeNonDripCashCost ?? 0;
+      const distributionPayback = lifetimeCashPurchases > 0 ? lifetimeDistributions / lifetimeCashPurchases : 0;
       const historicalEvents = historicalEventsByTicker.get(ticker) ?? [];
       const highestPayout = Math.max(...historicalEvents.map((event) => Math.max(event.amount ?? 0, 0)), 0);
       const recentDividends = historicalEvents
@@ -276,11 +298,42 @@ function buildAssetRows(
         dripShares: metric && metric.dripShares > 0 ? formatShares(metric.dripShares) : "-",
         dripAverageCostValue: dripAverageCost,
         dripAverageCost: dripAverageCost > 0 ? formatCurrency(dripAverageCost) : "-",
+        annualDividendIncomeValue: annualDividendIncome,
+        annualDividendIncome: annualDividendIncome > 0 ? formatCurrency(annualDividendIncome) : "$0.00",
+        yieldCostBasisValue: yieldCostBasis,
+        yieldCostBasis: yieldCostBasis > 0 ? formatCurrency(yieldCostBasis) : "-",
         yieldOnCostValue: yieldOnCost,
         yieldOnCost: yieldOnCost > 0 ? formatPercent(yieldOnCost) : "-",
+        yieldOnCostScaleMax: 0,
+        distributionPaybackValue: distributionPayback,
+        distributionPayback: distributionPayback > 0 ? formatPercent(distributionPayback) : "-",
+        lifetimeCashPurchasesValue: lifetimeCashPurchases,
+        lifetimeCashPurchases: lifetimeCashPurchases > 0 ? formatCurrency(lifetimeCashPurchases) : "-",
+        lifetimeDistributionsValue: lifetimeDistributions,
+        lifetimeDistributions: lifetimeDistributions > 0 ? formatCurrency(lifetimeDistributions) : "$0.00",
       };
-    })
+    });
+  const yieldOnCostScaleMax = buildYieldOnCostScaleMax(assetRows);
+
+  return assetRows
+    .map((row) => ({ ...row, yieldOnCostScaleMax }))
     .sort((left, right) => right.total - left.total);
+}
+
+// buildDividendTotalsByTicker totals dividend cash for each ticker in one requested period.
+function buildDividendTotalsByTicker(transactions: NormalizedTransaction[]) {
+  return transactions.reduce<Map<string, number>>((totals, transaction) => {
+    const ticker = transaction.ticker || "Cash";
+    totals.set(ticker, (totals.get(ticker) ?? 0) + Math.max(transaction.amount ?? 0, 0));
+    return totals;
+  }, new Map());
+}
+
+// buildYieldOnCostScaleMax creates a readable portfolio-relative YOC scale with a 10% minimum.
+function buildYieldOnCostScaleMax(rows: DividendAssetRow[]) {
+  const highestYield = Math.max(...rows.map((row) => row.yieldOnCostValue), 0);
+  const roundedFivePercentStep = Math.ceil((highestYield * 100) / 5) * 0.05;
+  return Math.max(roundedFivePercentStep, 0.1);
 }
 
 // buildHistoricalDividendEventsByTicker maps all CSV dividend payouts to each ticker.
@@ -408,6 +461,7 @@ function createEmptyMetric(transaction: NormalizedTransaction): DividendHoldingM
     nonDripCost: 0,
     dripShares: 0,
     dripCost: 0,
+    lifetimeNonDripCashCost: 0,
   };
 }
 
@@ -427,6 +481,7 @@ function applyBuy(metric: DividendHoldingMetric, transaction: NormalizedTransact
 
   metric.nonDripShares += quantity;
   metric.nonDripCost += cost;
+  metric.lifetimeNonDripCashCost += cost;
 }
 
 // reduceOpenPosition removes sold or transferred shares proportionally from cost buckets.

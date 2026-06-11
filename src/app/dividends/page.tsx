@@ -9,7 +9,7 @@ const monthSortKeys: DividendSortKey[] = ["jan", "feb", "mar", "apr", "may", "ju
 
 // HiddenSortOptions are popout-only metrics that can still drive row order.
 const hiddenSortOptions: { key: DividendSortKey; label: string; defaultDirection: DividendSortDirection }[] = [
-  { key: "yoc", label: "YOC", defaultDirection: "desc" },
+  { key: "yoc", label: "Annual YOC", defaultDirection: "desc" },
   { key: "dripShares", label: "DRIP Shares", defaultDirection: "desc" },
 ];
 
@@ -98,7 +98,12 @@ export default async function DividendsPage({
         </div>
         <div className="grid gap-3">
           {dividendData.assetRows.map((row, rowIndex) => (
-            <DividendMobileCard key={row.ticker} row={row} openUp={rowIndex >= Math.max(dividendData.assetRows.length - 3, 0)} />
+            <DividendMobileCard
+              key={row.ticker}
+              row={row}
+              openUp={rowIndex >= Math.max(dividendData.assetRows.length - 3, 0)}
+              yieldOnCostYear={dividendData.yieldOnCostYear}
+            />
           ))}
         </div>
       </section>
@@ -139,7 +144,11 @@ export default async function DividendsPage({
               {dividendData.assetRows.map((row, rowIndex) => (
                 <tr key={row.ticker} className="border-t transition-colors hover:bg-secondary/45">
                   <td className="relative px-2 py-2 font-semibold">
-                    <TickerMetricPopover row={row} openUp={rowIndex >= Math.max(dividendData.assetRows.length - 5, 0)} />
+                    <TickerMetricPopover
+                      row={row}
+                      openUp={rowIndex >= Math.max(dividendData.assetRows.length - 5, 0)}
+                      yieldOnCostYear={dividendData.yieldOnCostYear}
+                    />
                   </td>
                   {row.displayMonthly.map((amount, index) => (
                     <td key={`${row.ticker}-${dividendData.months[index].label}`} className="truncate px-1 py-2 text-right font-mono">
@@ -255,7 +264,7 @@ function buildCumulativeDividendPoints(points: DividendTrendPoint[]): DividendTr
 }
 
 // DividendMobileCard renders one dividend asset without requiring horizontal table scrolling.
-function DividendMobileCard({ row, openUp }: { row: DividendAssetRow; openUp: boolean }) {
+function DividendMobileCard({ row, openUp, yieldOnCostYear }: { row: DividendAssetRow; openUp: boolean; yieldOnCostYear: number }) {
   const paidMonths = row.displayMonthly
     .map((amount, index) => ({ amount, label: monthSortKeys[index].toUpperCase() }))
     .filter((month) => month.amount !== "-");
@@ -264,17 +273,19 @@ function DividendMobileCard({ row, openUp }: { row: DividendAssetRow; openUp: bo
     <article className="min-w-0 rounded-xl border bg-card/90 p-3 shadow-[0_18px_45px_rgba(0,0,0,0.20)]">
       <div className="min-w-0">
         <div className="min-w-0">
-          <TickerMetricPopover row={row} openUp={openUp} />
+          <TickerMetricPopover row={row} openUp={openUp} yieldOnCostYear={yieldOnCostYear} />
           <p className="mt-1 max-w-full truncate text-xs text-muted-foreground">{row.name}</p>
         </div>
       </div>
       <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
         <MobileStat label="Total" value={row.displayTotal} tone="positive" />
-        <MobileStat label="YOC" value={row.yieldOnCost} />
         <MobileStat label="DRIP Shares" value={row.dripShares} />
         <MobileStat label="Avg Cost" value={row.standardAverageCost} />
         <MobileStat label="Highest Payout" value={row.highestPayout} />
         <MobileStat label="Weekly Avg" value={formatFullCurrency(row.total / 52)} />
+      </div>
+      <div className="mt-3">
+        <IncomeProgressMeters row={row} yieldOnCostYear={yieldOnCostYear} compact />
       </div>
       <div className="mt-3 grid grid-cols-3 gap-1.5">
         {paidMonths.slice(0, 6).map((month) => (
@@ -491,7 +502,7 @@ function toggleDirection(direction: DividendSortDirection) {
 }
 
 // TickerMetricPopover makes each ticker a hover/click target for the advanced dividend metrics.
-function TickerMetricPopover({ row, openUp }: { row: DividendAssetRow; openUp: boolean }) {
+function TickerMetricPopover({ row, openUp, yieldOnCostYear }: { row: DividendAssetRow; openUp: boolean; yieldOnCostYear: number }) {
   return (
     <details className="group relative w-fit">
       <summary className="cursor-pointer list-none rounded-lg px-1 text-primary outline-none transition-colors hover:bg-primary/10 hover:text-foreground focus-visible:bg-primary/10 focus-visible:ring-2 focus-visible:ring-ring/40 [&::-webkit-details-marker]:hidden">
@@ -532,12 +543,7 @@ function TickerMetricPopover({ row, openUp }: { row: DividendAssetRow; openUp: b
             description="Average cost after removing the dollars that came from DRIP purchases."
             formula="(Open cost basis minus DRIP cost) divided by open shares."
           />
-          <MetricDetail
-            label="YOC"
-            value={row.yieldOnCost}
-            description="Yield on cost for the selected calendar year."
-            formula="Selected-year dividends divided by remaining non-DRIP cost basis."
-          />
+          <IncomeProgressMeters row={row} yieldOnCostYear={yieldOnCostYear} />
           <MetricDetail
             label="Highest Dividend Payout"
             value={row.highestPayout}
@@ -554,6 +560,111 @@ function TickerMetricPopover({ row, openUp }: { row: DividendAssetRow; openUp: b
         </div>
       </div>
     </details>
+  );
+}
+
+// IncomeProgressMeters pairs annual YOC with lifetime distribution payback in one reusable visual block.
+function IncomeProgressMeters({
+  compact = false,
+  row,
+  yieldOnCostYear,
+}: {
+  compact?: boolean;
+  row: DividendAssetRow;
+  yieldOnCostYear: number;
+}) {
+  return (
+    <div className={cn("space-y-2", compact ? "rounded-xl border bg-secondary/30 p-2" : "rounded-lg border border-border/70 bg-secondary/35 p-2")}>
+      <IncomeProgressMeter
+        detail={`${row.annualDividendIncome} received / ${row.yieldCostBasis} remaining cash-funded basis`}
+        description="Annual yield on cost compares distributions received in this calendar year with the remaining non-DRIP cash cost basis."
+        formula={`${yieldOnCostYear} distributions / remaining non-DRIP cost basis`}
+        label={`${yieldOnCostYear} YOC`}
+        maxValue={row.yieldOnCostScaleMax}
+        scaleLabel={`0-${formatPercentValue(row.yieldOnCostScaleMax)}`}
+        tone="annual"
+        value={row.yieldOnCostValue}
+        valueLabel={row.yieldOnCost}
+      />
+      <IncomeProgressMeter
+        detail={`${row.lifetimeDistributions} received / ${row.lifetimeCashPurchases} cash purchased`}
+        description="Distribution Payback shows how much of lifetime cash-funded purchases has been returned through historical distributions. It can include return of capital."
+        formula="All historical distributions / lifetime non-DRIP cash purchases"
+        label="Distribution Payback"
+        maxValue={1}
+        scaleLabel={row.distributionPaybackValue >= 1 ? "Payback reached" : "0-100% milestone"}
+        tone="payback"
+        value={row.distributionPaybackValue}
+        valueLabel={row.distributionPayback}
+      />
+    </div>
+  );
+}
+
+// IncomeProgressMeter renders one animated percentage bar with an accessible formula tooltip.
+function IncomeProgressMeter({
+  description,
+  detail,
+  formula,
+  label,
+  maxValue,
+  scaleLabel,
+  tone,
+  value,
+  valueLabel,
+}: {
+  description: string;
+  detail: string;
+  formula: string;
+  label: string;
+  maxValue: number;
+  scaleLabel: string;
+  tone: "annual" | "payback";
+  value: number;
+  valueLabel: string;
+}) {
+  const fillPercent = maxValue > 0 ? Math.min((value / maxValue) * 100, 100) : 0;
+  const milestoneReached = tone === "payback" && value >= 1;
+
+  return (
+    <div className="group/income-meter relative rounded-lg bg-[#171727]/75 p-2">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="truncate text-[10px] font-semibold uppercase text-muted-foreground">{label}</p>
+          <p className="mt-0.5 truncate text-[10px] text-muted-foreground">{detail}</p>
+        </div>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <span className={cn("font-mono text-xs font-bold", tone === "annual" ? "text-primary" : milestoneReached ? "text-emerald-200" : "text-emerald-300")}>
+            {valueLabel}
+          </span>
+          <span className="rounded-full text-muted-foreground outline-none transition-colors group-hover/income-meter:text-primary" tabIndex={0}>
+            <HelpCircle className="size-3.5" aria-hidden="true" />
+          </span>
+        </div>
+      </div>
+
+      <div className={cn("income-meter-track mt-2 h-2 overflow-hidden rounded-full", milestoneReached && "ring-1 ring-emerald-300/50")}>
+        <div
+          className={cn(
+            "income-meter-fill h-full rounded-full",
+            tone === "annual" ? "income-meter-annual" : "income-meter-payback",
+            milestoneReached && "income-meter-complete",
+          )}
+          style={{ width: `${fillPercent}%` }}
+        />
+      </div>
+
+      <div className="mt-1 flex items-center justify-between gap-2 font-mono text-[9px] text-muted-foreground">
+        <span>0%</span>
+        <span>{scaleLabel}</span>
+      </div>
+
+      <div className="pointer-events-none absolute left-0 top-[calc(100%+8px)] z-50 w-64 rounded-xl border bg-[#24243a] p-3 text-xs opacity-0 shadow-[0_18px_45px_rgba(0,0,0,0.36)] transition-opacity group-hover/income-meter:opacity-100 group-focus-within/income-meter:opacity-100">
+        <p className="font-semibold text-foreground">{label}</p>
+        <p className="mt-1 leading-5 text-muted-foreground">{description}</p>
+        <p className="mt-2 rounded-lg border bg-[#191929] p-2 font-mono text-[11px] leading-4 text-primary">{formula}</p>
+      </div>
+    </div>
   );
 }
 
@@ -640,5 +751,13 @@ function formatFullCurrency(value: number) {
     currency: "USD",
     maximumFractionDigits: 2,
     style: "currency",
+  }).format(value);
+}
+
+// formatPercentValue renders raw decimal ratios for meter scale labels.
+function formatPercentValue(value: number) {
+  return new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: 1,
+    style: "percent",
   }).format(value);
 }
